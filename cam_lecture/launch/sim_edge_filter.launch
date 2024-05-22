@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <launch>
   <include file="$(find gazebo_ros)/launch/empty_world.launch">
-    <arg name="world_name" value="sensor_station_coke_box.world" />
+    <arg name="world_name" value="slope.world" />
   </include>
 
   <node name="edge_filter" pkg="cam_lecture" type="edge_filter.py" />

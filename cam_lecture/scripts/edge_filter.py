@@ -15,7 +15,7 @@ class cvBridgeDemo:
         #「on_shutdown」はスクリプトが終了するときに呼ばれるコールバック
         rospy.on_shutdown(self.cleanup)
         
-        #OpenCVとROS２のやり取りに必要なやつ
+        #OpenCVとROSのやり取りに必要なやつ
         self.bridge = CvBridge()
         
         #画像入力
