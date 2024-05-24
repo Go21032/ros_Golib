@@ -4,7 +4,7 @@
     <arg name="world_name" value="display_stl.world" />
   </include>
 
-  <node name="edge_filter" pkg="cam_lecture" type="edge_filter.py" />
+  <node name="slope_filter" pkg="slope_edge_detection" type="slope_filter.py" />
 
   <node name="original_image_view" pkg="image_view" type="image_view" >
     <remap from="image" to="/head_camera/image_raw"/>

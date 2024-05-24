@@ -12,8 +12,15 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
   tf
+  image_geometry
+  image_transport
+  cv_bridge
+  jsk_recognition_msgs
+  vision_msgs
 )
 
+find_package(OpenCV)
+include_directories(${OpenCV_INCLUDE_DIRS})
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
