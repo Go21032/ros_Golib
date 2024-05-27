@@ -19,7 +19,7 @@ class cvBridgeDemo:
         self.bridge = CvBridge()
         
         #画像入力
-        self.image_sub = rospy.Subscriber("/head_camera/image_raw", Image, self.image_callback, queue_size=1)
+        self.image_sub = rospy.Subscriber("/camera/color/image_raw", Image, self.image_callback, queue_size=1)
         #画像出力
         self.image_pub = rospy.Publisher("/output/image_raw", Image, queue_size=1)
 
