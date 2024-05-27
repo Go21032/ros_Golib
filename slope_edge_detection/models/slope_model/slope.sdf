@@ -1,13 +1,13 @@
 <?xml version="1.0" ?>
-<sdf version="1.6">
-  <model name="measurement">
+<sdf version="1.4">
+  <model name="slope_model">
     <static>true</static>
     <link name="link">
       <collision name="collision">
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
-            <uri>model://measurement/meshes/slope_model.stl</uri>
+            <uri>model://slope_model/slope_ver2.stl</uri>
           </mesh>
         </geometry>
         <surface>
@@ -23,7 +23,7 @@
         <geometry>
           <mesh>
             <scale>0.001 0.001 0.001</scale>
-            <uri>model://measurement/meshes/slope_model.dae</uri>
+            <uri>model://slope_model/slope_ver2.stl</uri>
           </mesh>
         </geometry>
       </visual>
