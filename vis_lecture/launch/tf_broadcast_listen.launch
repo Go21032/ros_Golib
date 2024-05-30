@@ -1,7 +1,0 @@
-<launch>
-  <arg name="rvizconfig" default="$(find urdf_tutorial)/rviz/urdf.rviz" />
-  
-  <node name="rviz" pkg="rviz" type="rviz" args="-d $(arg rvizconfig)" required="true" />
-  <node name="vis_tf_broadcast" pkg="vis_lecture" type="vis_tf_broadcast"/>
-  <node name="vis_tf_listen"    pkg="vis_lecture" type="vis_tf_listen" output="screen"/>
-</launch>
