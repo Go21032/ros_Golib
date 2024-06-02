@@ -42,7 +42,7 @@ class cvBridgeDemo:
         grey = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) #カラー画像をグレースケール画像に変換しています。
         blur = cv2.blur(grey, (7, 7)) #グレースケール画像に7*7サイズのブラー(ぼかし)処理を適用しています
         #ブラー処理された画像に対してCanny法によるエッジ検出を行っています。15.0と30.0は、エッジを検出する閾値
-        edges = cv2.Canny(blur, 15.0, 30.0)
+        edges = cv2.Canny(blur, 50.0, 80.0)
         return edges
         
     def cleanup(self):
