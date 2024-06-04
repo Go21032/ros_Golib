@@ -15,7 +15,8 @@ from detector import Detector, parse_opt  # ROS 1用に適切なモジュール�
 class ObjectDetection:
 
     def __init__(self, **args):
-        self.target_name = 'cup'
+        #目標物によってtarget_nameを変更していく
+        self.target_name = 'person'
         self.frame_id = 'target'
 
         self.detector = Detector(**args)
@@ -25,29 +26,18 @@ class ObjectDetection:
         self.sub_info = Subscriber('camera/aligned_depth_to_color/camera_info', CameraInfo)
         self.sub_color = Subscriber('camera/color/image_raw', Image)
         self.sub_depth = Subscriber('camera/aligned_depth_to_color/image_raw', Image)
-        # self.sub_info = Subscriber(
-        #     self, CameraInfo, 'camera/aligned_depth_to_color/camera_info')
-        # self.sub_color = Subscriber(
-        #     self, Image, 'camera/color/image_raw')
-        # self.sub_depth = Subscriber(
-        #     self, Image, 'camera/aligned_depth_to_color/image_raw')
         self.ts = ApproximateTimeSynchronizer([self.sub_info, self.sub_color, self.sub_depth], 10, 0.1)
         self.ts.registerCallback(self.images_callback)
         self.broadcaster = TransformBroadcaster(self)
-        print('baka')
 
     def images_callback(self, msg_info, msg_color, msg_depth):
-        print('aho')
         try:
             img_color = self.bridge.imgmsg_to_cv2(msg_color, 'bgr8')
-            #passthroughから16UC1に変更
-            img_depth = self.bridge.imgmsg_to_cv2(msg_depth, '16UC1')
+            img_depth = self.bridge.imgmsg_to_cv2(msg_depth, 'passthrough')
             
             # img_depth配列をコピーして書き込み可能にする
-            #img_depth = img_depth.copy()
+            img_depth = img_depth.copy()
 
-            # 配列に対する操作
-            #img_depth *= 16
         except CvBridgeError as e:
             rospy.logwarn(str(e))
             return
@@ -119,18 +109,12 @@ def main():
 '''
 
 if __name__ == '__main__':
-    print('Hello')
     rospy.init_node('detection_tf')
-    print('Hello2')
     opt = parse_opt(args=sys.argv)
-    print('Hello3')
     node = ObjectDetection(**vars(opt))
-    print('Hello4')
     try:
         rospy.spin()
-        print('Hello5')
     except KeyboardInterrupt:
         pass
     rospy.signal_shutdown('KeyboardInterrupt')
-    print('Hello6')
 
