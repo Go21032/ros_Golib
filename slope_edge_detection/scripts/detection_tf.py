@@ -25,14 +25,29 @@ class ObjectDetection:
         self.sub_info = Subscriber('camera/aligned_depth_to_color/camera_info', CameraInfo)
         self.sub_color = Subscriber('camera/color/image_raw', Image)
         self.sub_depth = Subscriber('camera/aligned_depth_to_color/image_raw', Image)
+        # self.sub_info = Subscriber(
+        #     self, CameraInfo, 'camera/aligned_depth_to_color/camera_info')
+        # self.sub_color = Subscriber(
+        #     self, Image, 'camera/color/image_raw')
+        # self.sub_depth = Subscriber(
+        #     self, Image, 'camera/aligned_depth_to_color/image_raw')
         self.ts = ApproximateTimeSynchronizer([self.sub_info, self.sub_color, self.sub_depth], 10, 0.1)
         self.ts.registerCallback(self.images_callback)
-        self.broadcaster = TransformBroadcaster()
+        self.broadcaster = TransformBroadcaster(self)
+        print('baka')
 
     def images_callback(self, msg_info, msg_color, msg_depth):
+        print('aho')
         try:
             img_color = self.bridge.imgmsg_to_cv2(msg_color, 'bgr8')
-            img_depth = self.bridge.imgmsg_to_cv2(msg_depth, 'passthrough')
+            #passthroughから16UC1に変更
+            img_depth = self.bridge.imgmsg_to_cv2(msg_depth, '16UC1')
+            
+            # img_depth配列をコピーして書き込み可能にする
+            #img_depth = img_depth.copy()
+
+            # 配列に対する操作
+            #img_depth *= 16
         except CvBridgeError as e:
             rospy.logwarn(str(e))
             return
@@ -61,10 +76,10 @@ class ObjectDetection:
             depth = np.median(img_depth[v1:v2+1, u1:u2+1])
             if depth != 0:
                 z = depth * 1e-3
-                fx = msg_info.k[0]
-                fy = msg_info.k[4]
-                cx = msg_info.k[2]
-                cy = msg_info.k[5]
+                fx = msg_info.K[0]
+                fy = msg_info.K[4]
+                cx = msg_info.K[2]
+                cy = msg_info.K[5]
                 x = z / fx * (u - cx)
                 y = z / fy * (v - cy)
                 rospy.loginfo(f'{target.name} ({x:.3f}, {y:.3f}, {z:.3f})')
@@ -85,17 +100,37 @@ class ObjectDetection:
         cv2.imshow('depth', img_depth)
         cv2.waitKey(1)
 
-
+'''
 def main():
+    print('Hello')
     rospy.init_node('object_detection')
+    print('Hello2')
     opt = parse_opt(args=sys.argv)
+    print('Hello3')
     node = ObjectDetection(**vars(opt))
+    print('Hello4')
     try:
         rospy.spin()
+        print('Hello5')
     except KeyboardInterrupt:
         pass
     rospy.signal_shutdown('KeyboardInterrupt')
-
+    print('Hello6')
+'''
 
 if __name__ == '__main__':
-    main()
+    print('Hello')
+    rospy.init_node('detection_tf')
+    print('Hello2')
+    opt = parse_opt(args=sys.argv)
+    print('Hello3')
+    node = ObjectDetection(**vars(opt))
+    print('Hello4')
+    try:
+        rospy.spin()
+        print('Hello5')
+    except KeyboardInterrupt:
+        pass
+    rospy.signal_shutdown('KeyboardInterrupt')
+    print('Hello6')
+
