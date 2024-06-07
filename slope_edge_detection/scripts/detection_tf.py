@@ -2,7 +2,7 @@
 import sys
 import cv2
 import numpy as np
-
+import csv
 import rospy
 from sensor_msgs.msg import Image, CameraInfo
 from geometry_msgs.msg import TransformStamped
@@ -29,6 +29,13 @@ class ObjectDetection:
         self.ts = ApproximateTimeSynchronizer([self.sub_info, self.sub_color, self.sub_depth], 10, 0.1)
         self.ts.registerCallback(self.images_callback)
         self.broadcaster = TransformBroadcaster(self)
+        
+        # CSVファイルを開き、ライターを初期化
+        self.csv_file = open('object_distance.csv', 'w', newline='')
+        self.csv_writer = csv.writer(self.csv_file)
+        # CSVヘッダーを書き込む
+        self.csv_writer.writerow(['name', 'distance'])
+
 
     def images_callback(self, msg_info, msg_color, msg_depth):
         try:
@@ -81,6 +88,10 @@ class ObjectDetection:
                 dis_z = z ** 2
                 dis = np.sqrt(dis_x + dis_y + dis_z)
                 rospy.loginfo(f'{target.name} ({dis:.3f})')
+                
+                # CSVファイルに検出された対象の情報を書き込み
+                self.csv_writer.writerow([target.name, f'{dis:.3f}'])
+                
                 ts = TransformStamped()
                 ts.header = msg_depth.header
                 ts.child_frame_id = self.frame_id
@@ -98,24 +109,10 @@ class ObjectDetection:
         cv2.imshow('depth', img_depth)
         cv2.waitKey(1)
 
-'''
-def main():
-    print('Hello')
-    rospy.init_node('object_detection')
-    print('Hello2')
-    opt = parse_opt(args=sys.argv)
-    print('Hello3')
-    node = ObjectDetection(**vars(opt))
-    print('Hello4')
-    try:
-        rospy.spin()
-        print('Hello5')
-    except KeyboardInterrupt:
-        pass
-    rospy.signal_shutdown('KeyboardInterrupt')
-    print('Hello6')
-'''
-
+    def __del__(self):
+        # オブジェクトが削除される際にCSVファイルを閉じる
+        self.csv_file.close()
+        
 if __name__ == '__main__':
     rospy.init_node('detection_tf')
     opt = parse_opt(args=sys.argv)
@@ -123,6 +120,9 @@ if __name__ == '__main__':
     try:
         rospy.spin()
     except KeyboardInterrupt:
+        # CSVファイルを安全に閉じる
+        if node.csv_file:
+            node.csv_file.close()
         pass
     rospy.signal_shutdown('KeyboardInterrupt')
 
