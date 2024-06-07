@@ -33,7 +33,7 @@ class ObjectDetection:
     def images_callback(self, msg_info, msg_color, msg_depth):
         try:
             img_color = self.bridge.imgmsg_to_cv2(msg_color, 'bgr8')
-            img_depth = self.bridge.imgmsg_to_cv2(msg_depth, 'passthrough')
+            img_depth = self.bridge.imgmsg_to_cv2(msg_depth, 'passthrough')#passthroughは何も変換せず生のデータを
             
             # img_depth配列をコピーして書き込み可能にする
             img_depth = img_depth.copy()
