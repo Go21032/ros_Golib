@@ -92,7 +92,7 @@ class Detector:
         # Half
         # FP16 supported on limited backends with CUDA
         self.half &= ((self.pt or self.jit or self.onnx or self.engine)
-                      and self.device.type != 'cpu')
+                      and self.device.type != 'gpu')
         if self.pt or self.jit:
             self.model.model.half() if self.half else self.model.model.float()
 
@@ -174,7 +174,7 @@ def parse_opt(args):
         '--max-det', type=int, default=1000,
         help='maximum detections per image')
     parser.add_argument(
-        '--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
+        '--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or gpu')
     parser.add_argument(
         '--view-img', action='store_true', help='show results')
     parser.add_argument(
