@@ -16,7 +16,7 @@ class ObjectDetection:
 
     def __init__(self, **args):
         #目標物によってtarget_nameを変更していく
-        self.target_name = 'person'
+        self.target_name = 'bottle'
         self.frame_id = 'target'
 
         self.detector = Detector(**args)
@@ -72,7 +72,15 @@ class ObjectDetection:
                 cy = msg_info.K[5]
                 x = z / fx * (u - cx)
                 y = z / fy * (v - cy)
-                rospy.loginfo(f'{target.name} ({x:.3f}, {y:.3f}, {z:.3f})')
+                #loginfoでprit
+                #rospy.loginfo(f'{target.name} ({x:.3f}, {y:.3f}, {z:.3f})')
+                
+                #3次元空間における二点間の距離公式https://mathwords.net/nitennokyori
+                dis_x = x ** 2
+                dis_y = y ** 2
+                dis_z = z ** 2
+                dis = np.sqrt(dis_x + dis_y + dis_z)
+                rospy.loginfo(f'{target.name} ({dis:.3f})')
                 ts = TransformStamped()
                 ts.header = msg_depth.header
                 ts.child_frame_id = self.frame_id

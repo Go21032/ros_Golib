@@ -29,7 +29,7 @@ from utils.general import (check_img_size, check_imshow, check_requirements,
                            non_max_suppression, print_args, scale_coords)
 from utils.plots import Annotator, colors
 from utils.torch_utils import select_device
-from utils.augmentations import letterbox
+from utils.augmentations import letterbox #前処理
 
 
 class Result:
@@ -102,6 +102,8 @@ class Detector:
         cudnn.benchmark = True
         self.model.warmup(imgsz=(1, 3, *imgsz))  # warmup
 
+    #@torch.no_grad(): PyTorchのデコレーターで、この関数内での計算が自動微分機能に影響しないようにします。
+    # これにより、メモリ使用量が削減され、計算が高速化されます。
     @torch.no_grad()
     def detect(self, img0):
         img = letterbox(img0, self.imgsz, stride=self.stride)[0]
@@ -157,6 +159,7 @@ class Detector:
 def parse_opt(args):
     sys.argv = args
     parser = argparse.ArgumentParser()
+    #ArgumentParserのインスタンスを作成し、引数の解析を行う準備をします。
     parser.add_argument(
         '--weights', nargs='+', type=str, default=ROOT / 'yolov5s.pt',
         help='model path(s)')
