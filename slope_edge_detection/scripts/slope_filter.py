@@ -30,10 +30,11 @@ class cvBridgeDemo:
             input_image = self.bridge.imgmsg_to_cv2(ros_image, "bgr8")
         except CvBridgeError as e:
             print(e)
+        
         output_image = self.process_image(input_image)
 
-        #処理したグレー画像をpubに出力
-        self.image_pub.publish(self.bridge.cv2_to_imgmsg(output_image, "mono8"))
+        #処理したグレー画像をpubに出力→mono8からbgr8に変更
+        self.image_pub.publish(self.bridge.cv2_to_imgmsg(output_image, "bgr8"))
         
         #変換前と後の画像を新しくウィンドウを作って表示します
         cv2.imshow(self.node_name, output_image)   
@@ -41,10 +42,16 @@ class cvBridgeDemo:
                           
     def process_image(self, frame):
         grey = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) #カラー画像をグレースケール画像に変換しています。
-        blur = cv2.blur(grey, (7, 7)) #グレースケール画像に7*7サイズのブラー(ぼかし)処理を適用しています
+        blur = cv2.blur(grey, (11,11)) #グレースケール画像に7*7サイズのブラー(ぼかし)処理を適用しています
         #ブラー処理された画像に対してCanny法によるエッジ検出を行っています。15.0と30.0は、エッジを検出する閾値
-        edges = cv2.Canny(blur, 50.0, 80.0)
-        return edges
+        edges = cv2.Canny(blur, 20.0, 60.0)
+        # 輪郭を検出
+        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # 元の画像に輪郭内を塗りつぶす
+        output_image = frame.copy()
+        cv2.drawContours(output_image, contours, -1, (0, 255, 0), thickness=cv2.FILLED)
+        
+        return output_image
         
     def cleanup(self):
         #スクリプトが終了されたときに呼ばれるもので、これで開いているウィンドウをすべて閉じる

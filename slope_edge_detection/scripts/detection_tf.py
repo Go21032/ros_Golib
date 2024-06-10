@@ -60,6 +60,7 @@ class ObjectDetection:
             return
 
         img_color, result = self.detector.detect(img_color)
+        rospy.loginfo("Detection completed")
 
         cv2.imshow('color', img_color)
 
