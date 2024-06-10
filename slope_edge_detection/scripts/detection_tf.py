@@ -4,6 +4,8 @@ import cv2
 import numpy as np
 import csv
 import rospy
+from datetime import datetime
+
 from sensor_msgs.msg import Image, CameraInfo
 from geometry_msgs.msg import TransformStamped
 from cv_bridge import CvBridge, CvBridgeError
@@ -29,9 +31,13 @@ class ObjectDetection:
         self.ts = ApproximateTimeSynchronizer([self.sub_info, self.sub_color, self.sub_depth], 10, 0.1)
         self.ts.registerCallback(self.images_callback)
         self.broadcaster = TransformBroadcaster(self)
+        #時間取得        
+        current_time = datetime.now().strftime('%Y%m%d_%H%M%S')
+        # ファイル名に現在の時刻を加える
+        file_name = f'object_distance_{current_time}.csv'
         
         # CSVファイルを開き、ライターを初期化
-        self.csv_file = open('object_distance.csv', 'w', newline='')
+        self.csv_file = open(file_name, 'w', newline='')
         self.csv_writer = csv.writer(self.csv_file)
         # CSVヘッダーを書き込む
         self.csv_writer.writerow(['name', 'distance'])
