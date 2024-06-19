@@ -16,7 +16,7 @@ import numpy as np
 workspace = Path("/home/go/slope_ws/src")
 print('workspace:', workspace)
 # ワークスペースの直下にディレクトリyolov5があることを仮定
-ROOT = workspace / 'yolov5'
+ROOT = workspace / 'datasets'
 print('ROOT:', ROOT)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))  # add ROOT to PATH
@@ -46,7 +46,7 @@ class Detector:
 
     def __init__(
         self,
-        weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
+        weights=ROOT / 'last.pt',  # model.pt path(s)
         data=ROOT / 'data/coco128.yaml',  # dataset.yaml path
         imgsz=(640, 640),  # inference size (height, width)
         conf_thres=0.25,  # confidence threshold
