@@ -16,7 +16,7 @@ import numpy as np
 workspace = Path("/home/go/slope_ws/src")
 print('workspace:', workspace)
 # ワークスペースの直下にディレクトリyolov5があることを仮定
-ROOT = workspace / 'datasets'
+ROOT = workspace / 'yolov5'
 print('ROOT:', ROOT)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))  # add ROOT to PATH
