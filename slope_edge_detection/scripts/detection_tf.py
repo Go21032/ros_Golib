@@ -12,7 +12,7 @@ from cv_bridge import CvBridge, CvBridgeError
 from message_filters import Subscriber, ApproximateTimeSynchronizer
 from tf import TransformBroadcaster
 
-from detector import Detector, parse_opt  # ROS 1用に適切なモジュールに変更してください
+from detector import Detector, parse_opt  # detector.pyから引用。ROS 1用に適切なモジュールに変更してください
 
 class ObjectDetection:
 
@@ -25,10 +25,15 @@ class ObjectDetection:
 
         self.bridge = CvBridge()
 
+        # sub_infoからsub_depthはmessage_filtersのSubscriberクラスのインスタンスを生成している
         self.sub_info = Subscriber('camera/aligned_depth_to_color/camera_info', CameraInfo)
         self.sub_color = Subscriber('camera/color/image_raw', Image)
         self.sub_depth = Subscriber('camera/aligned_depth_to_color/image_raw', Image)
+        
+        # 同期処理のためのApproximateTimeSynchronizerクラスのインスタンス生成
         self.ts = ApproximateTimeSynchronizer([self.sub_info, self.sub_color, self.sub_depth], 10, 0.1)
+        
+        # すべてのトピックのメッセージが揃ったときに呼ばれるコールバック
         self.ts.registerCallback(self.images_callback)
         self.broadcaster = TransformBroadcaster(self)
         #時間取得        
