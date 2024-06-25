@@ -13,7 +13,7 @@ class Slope:
     pipeline.start(config)
 
     # YOLOモデルを読み込む
-    model = YOLO('last.pt')
+    model = YOLO('best.pt')
 
     try:
         while True:
@@ -46,7 +46,7 @@ class Slope:
 # from ultralytics import YOLO
 # import cv2
 
-# model = YOLO("/home/go/slope_ws/src/ros_Golib/slope_edge_detection/scripts/last.pt")
+# model = YOLO("/home/go/slope_ws/src/ros_Golib/slope_edge_detection/scripts/best.pt")
 
-# im2 = cv2.imread("/home/go/slope_ws/src/ros_Golib/slope_edge_detection/scripts/abe_slope1.jpg")
+# im2 = cv2.imread("/home/go/slope_ws/src/ros_Golib/slope_edge_detection/scripts/IMG_9448.jpg")
 # results = model.predict(source=im2, save=True)
