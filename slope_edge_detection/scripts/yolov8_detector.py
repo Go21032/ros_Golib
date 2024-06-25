@@ -11,7 +11,7 @@ import numpy as np
 workspace = Path("/home/go/slope_ws/src")
 print('workspace:', workspace)
 # ワークスペースの直下にディレクトリyolov8があることを仮定
-ROOT = workspace / 'yolov8_slope'
+ROOT = workspace / 'YOLODataset'
 print('ROOT:', ROOT)
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))  # add ROOT to PATH
@@ -41,10 +41,10 @@ class Detector:
 
     def __init__(
         self,
-        weights=ROOT / 'last.pt',  # model.pt path(s)
-        data=ROOT / 'data/coco128.yaml',  # dataset.yaml path
+        weights=ROOT / 'best.pt',  # model.pt path(s)
+        data=ROOT / 'dataset.yaml',  # dataset.yaml path
         imgsz=(640, 640),  # inference size (height, width)
-        conf_thres=0.25,  # confidence threshold
+        conf_thres=0.8,  # confidence threshold
         iou_thres=0.45,  # NMS IOU threshold
         max_det=1000,  # maximum detections per image
         device='',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
