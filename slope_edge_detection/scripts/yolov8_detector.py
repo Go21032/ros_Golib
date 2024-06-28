@@ -18,13 +18,14 @@ if str(ROOT) not in sys.path:
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
 # ファイルの先頭でimportしていないのでFlake8に怒られる（E402）
-# yolov5で用意されたモジュールを利用するためにやむなくこうしている．
-from models.common import DetectMultiBackend
-from utils.general import (check_img_size, check_imshow, check_requirements,
-                           non_max_suppression, print_args, scale_coords)
-from utils.plots import Annotator, colors
-from utils.torch_utils import select_device
-from utils.augmentations import letterbox #前処理
+# yolov5で用意されたモジュールをyolov8でも使えるか互換性を見て行っている。
+from ultralytics.engine.model import Model
+from ultralytics.utils.ops import (scale_coords, non_max_suppression,)
+#check_imgszがcheck_img_sizeの代用
+from ultralytics.utils.checks import (check_imgsz, check_imshow, check_requirements, print_args)
+from ultralytics.utils.plotting import Annotator, colors
+from ultralytics.utils.torch_utils import select_device
+from ultralytics.data.augment import LetterBox
 
 
 class Result:
@@ -37,7 +38,7 @@ class Result:
         self.conf = float(conf)
 
 
-class Detector:
+class Detectorv8:
 
     def __init__(
         self,
@@ -45,7 +46,7 @@ class Detector:
         data=ROOT / 'dataset.yaml',  # dataset.yaml path
         imgsz=(640, 640),  # inference size (height, width)
         conf_thres=0.8,  # confidence threshold
-        iou_thres=0.45,  # NMS IOU threshold
+        iou_thres=0.65,  # NMS IOU threshold
         max_det=1000,  # maximum detections per image
         device='',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
         view_img=False,  # show results
@@ -62,7 +63,7 @@ class Detector:
         check_requirements(exclude=('tensorboard', 'thop'))
         # Load model
         self.device = select_device(device)
-        self.model = DetectMultiBackend(
+        self.model = Model(
             weights, device=self.device, dnn=dnn, data=data)
         self.stride = self.model.stride
         self.names = self.model.names
@@ -70,7 +71,7 @@ class Detector:
         self.jit = self.model.jit
         self.onnx = self.model.onnx
         self.engine = self.model.engine
-        self.imgsz = check_img_size(imgsz, s=self.stride)  # check image size
+        self.imgsz = check_imgsz(imgsz, s=self.stride)  # check image size
         self.view_img = view_img
         self.augment = augment
         self.visualize = visualize
@@ -87,7 +88,7 @@ class Detector:
         # Half
         # FP16 supported on limited backends with CUDA
         self.half &= ((self.pt or self.jit or self.onnx or self.engine)
-                      and self.device.type != 'gpu')
+                      and self.device.type != 'cpu')
         if self.pt or self.jit:
             self.model.model.half() if self.half else self.model.model.float()
 
@@ -101,7 +102,7 @@ class Detector:
     # これにより、メモリ使用量が削減され、計算が高速化されます。
     @torch.no_grad()
     def detect(self, img0):
-        img = letterbox(img0, self.imgsz, stride=self.stride)[0]
+        img = LetterBox(img0, self.imgsz, stride=self.stride)[0]
 
         img = img.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
         img = np.ascontiguousarray(img)
