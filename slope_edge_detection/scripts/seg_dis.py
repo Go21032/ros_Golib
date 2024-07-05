@@ -26,7 +26,7 @@ for item in items:
     label = item.names[int(cls)]
     score = item.boxes.conf.cpu().numpy()[0]
     x1,y1,x2,y2 = item.boxes.xyxy.cpu().numpy()[0]
-    
+        
     # 距離を計算 (ピクセル単位)
     distance_pixels = math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
     
