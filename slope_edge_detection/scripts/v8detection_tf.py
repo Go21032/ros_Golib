@@ -138,4 +138,3 @@ if __name__ == '__main__':
             node.csv_file.close()
         pass
     rospy.signal_shutdown('KeyboardInterrupt')
-

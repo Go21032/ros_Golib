@@ -58,13 +58,11 @@ class Detectorv8:
         hide_labels=False,  # hide labels
         hide_conf=False,  # hide confidences
         half=False,  # use FP16 half-precision inference
-        dnn=False,  # use OpenCV DNN for ONNX inference    ):
     ):
         check_requirements(exclude=('tensorboard', 'thop'))
         # Load model
         self.device = select_device(device)
-        self.model = Model(
-            weights, device=self.device, dnn=dnn, data=data)
+        self.model = Model(weights, data=data)
         self.stride = self.model.stride
         self.names = self.model.names
         self.pt = self.model.pt
@@ -98,8 +96,6 @@ class Detectorv8:
         cudnn.benchmark = True
         self.model.warmup(imgsz=(1, 3, *imgsz))  # warmup
 
-    #@torch.no_grad(): PyTorchのデコレーターで、この関数内での計算が自動微分機能に影響しないようにします。
-    # これにより、メモリ使用量が削減され、計算が高速化されます。
     @torch.no_grad()
     def detect(self, img0):
         img = LetterBox(img0, self.imgsz, stride=self.stride)[0]
@@ -151,29 +147,28 @@ class Detectorv8:
         else:
             return img0, []
 
-
 def parse_opt(args):
     sys.argv = args
     parser = argparse.ArgumentParser()
     #ArgumentParserのインスタンスを作成し、引数の解析を行う準備をします。
     parser.add_argument(
-        '--weights', nargs='+', type=str, default=ROOT / 'yolov5s.pt',
+        '--weights', nargs='+', type=str, default=ROOT / 'best.pt',
         help='model path(s)')
     parser.add_argument(
-        '--data', type=str, default=ROOT / 'data/coco128.yaml',
+        '--data', type=str, default=ROOT / 'dataset.yaml',
         help='(optional) dataset.yaml path')
     parser.add_argument(
         '--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640],
         help='inference size h,w')
     parser.add_argument(
-        '--conf-thres', type=float, default=0.25, help='confidence threshold')
+        '--conf-thres', type=float, default=0.8, help='confidence threshold')
     parser.add_argument(
         '--iou-thres', type=float, default=0.45, help='NMS IoU threshold')
     parser.add_argument(
         '--max-det', type=int, default=1000,
         help='maximum detections per image')
     parser.add_argument(
-        '--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or gpu')
+        '--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument(
         '--view-img', action='store_true', help='show results')
     parser.add_argument(
@@ -197,9 +192,9 @@ def parse_opt(args):
     parser.add_argument(
         '--half', action='store_true',
         help='use FP16 half-precision inference')
-    parser.add_argument(
-        '--dnn', action='store_true',
-        help='use OpenCV DNN for ONNX inference')
+    # parser.add_argument(
+    #     '--dnn', action='store_true',
+    #     help='use OpenCV DNN for ONNX inference')
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     print_args(vars(opt))
