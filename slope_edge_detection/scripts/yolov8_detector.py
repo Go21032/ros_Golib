@@ -43,7 +43,7 @@ class Detectorv8:
     def __init__(
         self,
         weights=ROOT / 'best.pt',  # model.pt path(s)
-        data=ROOT / 'dataset.yaml',  # dataset.yaml path
+        #data=ROOT / 'dataset.yaml',  # dataset.yaml path
         imgsz=(640, 640),  # inference size (height, width)
         conf_thres=0.8,  # confidence threshold
         iou_thres=0.65,  # NMS IOU threshold
@@ -62,7 +62,7 @@ class Detectorv8:
         check_requirements(exclude=('tensorboard', 'thop'))
         # Load model
         self.device = select_device(device)
-        self.model = Model(weights, data=data)
+        self.model = Model(weights)#data引数削除
         self.stride = self.model.stride
         self.names = self.model.names
         self.pt = self.model.pt
@@ -154,9 +154,9 @@ def parse_opt(args):
     parser.add_argument(
         '--weights', nargs='+', type=str, default=ROOT / 'best.pt',
         help='model path(s)')
-    parser.add_argument(
-        '--data', type=str, default=ROOT / 'dataset.yaml',
-        help='(optional) dataset.yaml path')
+    # parser.add_argument(
+    #     '--data', type=str, default=ROOT / 'dataset.yaml',
+    #     help='(optional) dataset.yaml path')
     parser.add_argument(
         '--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640],
         help='inference size h,w')
