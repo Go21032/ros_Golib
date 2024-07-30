@@ -7,7 +7,7 @@ import os
 
 model = YOLO("/home/go/slope_ws/src/ros_Golib/slope_edge_detection/scripts/best.pt")
 
-img = Image.open("/home/go/slope_ws/src/ros_Golib/slope_edge_detection/scripts/IMG_9448.jpg")
+img = Image.open("/home/go/slope_ws/src/ros_Golib/slope_edge_detection/scripts/2dd/kennsyou/0fbaf86c4847b984807d5f62160f827f.png")
 results = model.predict(source=img, save=True)
 
 masks = results[0].masks
@@ -67,7 +67,7 @@ print("Median coordinate:", (median_x, median_y))
 cv2.circle(img, (median_x, median_y), 10, (255, 0, 0), -1)
 
 # 画像を表示＆保存
-cv2.imwrite('top_mask.jpg', img)
+cv2.imwrite('top_mask5.jpg', img)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
 
