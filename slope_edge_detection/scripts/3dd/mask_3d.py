@@ -14,7 +14,7 @@ class SlopeDetectionNode:
         self.bridge = CvBridge()
 
         # モデルの初期化
-        self.model = YOLO("/home/go/slope_ws/src/ros_Golib/slope_edge_detection/scripts/pl2_best.pt")
+        self.model = YOLO("/home/go/slope_ws/src/ros_Golib/slope_edge_detection/scripts/3dd/pl2_best.pt")
 
         # サブスクライバの初期化
         self.sub_info = Subscriber('/camera/aligned_depth_to_color/camera_info', CameraInfo)

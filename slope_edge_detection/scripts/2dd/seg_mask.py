@@ -10,6 +10,7 @@ from message_filters import Subscriber, ApproximateTimeSynchronizer
 from tf import TransformBroadcaster
 import rospy
 
+#これはボツコード
 class maskDetectionv8:
     def __init__(self):
         self.model = YOLO("/home/go/slope_ws/src/ros_Golib/slope_edge_detection/scripts/best.pt")
