@@ -7,7 +7,7 @@ import os
 
 model = YOLO("/home/go/slope_ws/src/ros_Golib/slope_edge_detection/scripts/best.pt")
 
-img = Image.open("/home/go/slope_ws/src/ros_Golib/slope_edge_detection/scripts/2dd/kennsyou/0fbaf86c4847b984807d5f62160f827f.png")
+img = Image.open("/home/go/slope_ws/src/ros_Golib/slope_edge_detection/scripts/2dd/kennsyou/slope_27.jpg")
 results = model.predict(source=img, save=True)
 
 masks = results[0].masks
@@ -36,8 +36,8 @@ img = np.array(img)
 # OpenCVで使用するためにRGBからBGRに変換
 img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
+#y座標が高い順にソート
 '''
-y座標が高い順にソート
 sorted() は、リストを特定の順序でソートするためのPythonの組み込み関数。
 point はソートしたいリストです。このリストは、各要素が座標（[x, y] の形）を表している。
 key=lambda x: x[1] は、ソートの基準となるキーを指定します。ここでは、各要素（座標）のy座標（インデックス1の値）を基準にソートしている。
@@ -67,7 +67,7 @@ print("Median coordinate:", (median_x, median_y))
 cv2.circle(img, (median_x, median_y), 10, (255, 0, 0), -1)
 
 # 画像を表示＆保存
-cv2.imwrite('top_mask5.jpg', img)
+cv2.imwrite('top_mask2.jpg', img)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
 
