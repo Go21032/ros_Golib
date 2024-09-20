@@ -69,7 +69,7 @@ class ObjectDetection:
 
         cv2.imshow('color', img_color)
 
-        target = None
+        target = None # ただの文字だっやtargetが変数になった瞬間
         for r in result:
             if r.name == self.target_name:
                 target = r

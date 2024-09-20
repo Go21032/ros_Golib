@@ -20,24 +20,23 @@ class SlopeDetection:
         self.bridge = CvBridge()
         self.frame_id = 'slope'
         
-        # Subscribers for synchronized image and camera info
         self.sub_info = Subscriber('camera/aligned_depth_to_color/camera_info', CameraInfo)
         self.sub_color = Subscriber('camera/color/image_raw', Image)
         self.sub_depth = Subscriber('camera/aligned_depth_to_color/image_raw', Image)
         
-        # Synchronize the image and camera info topics
+        # 画像とカメラ情報のトピックを同期させる
         self.ts = ApproximateTimeSynchronizer([self.sub_info, self.sub_color, self.sub_depth], 10, 0.1)
         self.ts.registerCallback(self.images_callback)
         
         # Transform broadcaster
         self.broadcaster = TransformBroadcaster()
         
-        # Prepare CSV file
+        # CSV file
         current_time = datetime.now().strftime('%Y%m%d_%H%M%S')
-        file_name = f'slope_coordinates_{current_time}.csv'
+        file_name = f'slope_3次元座標{current_time}.csv'
         self.csv_file = open(file_name, 'w', newline='')
         self.csv_writer = csv.writer(self.csv_file)
-        self.csv_writer.writerow(['X', 'Y', 'Z'])
+        self.csv_writer.writerow(['name', 'X', 'Y', 'Z', 'distance'])
 
     def images_callback(self, msg_info, msg_color, msg_depth):
         try:
@@ -57,13 +56,59 @@ class SlopeDetection:
         masks = results[0].masks
 
         if masks:
-            # Get the top 50 points with highest y-coordinates
-            point = np.array(masks[0].xy)
-            point = sorted(point, key=lambda x: x[1], reverse=True)[:50]
+            masks = results[0].masks
+            x_numpy = masks[0].data.to('cpu').detach().numpy().copy()
+            print(x_numpy.shape)
+
+            name = results[0].names
+            print(name)   
+            point = masks[0].xy
+            point = np.array(point)
+
+            # ３次元を２次元に変換する
+            result = []
+            for i in range(len(point)):
+                for j in range(len(point[i])):
+                    my_list = []
+                    for k in range(len(point[i][j])):
+                        my_list.append(point[i][j][k])
+                    result.append(my_list)
+            result = np.array(result)
+            point = result
+
+            # PIL Imageをnumpy配列に変換
+            img = np.array(img)
+
+            # OpenCVで使用するためにRGBからBGRに変換
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+
+            #y座標が高い順にソート
+            '''
+            sorted() は、リストを特定の順序でソートするためのPythonの組み込み関数。
+            point はソートしたいリストです。このリストは、各要素が座標（[x, y] の形）を表している。
+            key=lambda x: x[1] は、ソートの基準となるキーを指定します。ここでは、各要素（座標）のy座標（インデックス1の値）を基準にソートしている。
+            x は point リストの各要素を指します。各要素は座標であり、今回は[u, v] という形。
+            x: x[1] は、リストの各要素 x のインデックス1の値（つまり y 座標）を返す。
+            '''
+            point = sorted(point, key=lambda x: x[1], reverse=True)
+
+            # 上位50個のy座標が高い座標を取得
+            top_points = point[:50]
+
+            # 座標の表示
+            for i in range(len(top_points)):
+                (u, v) = (int(top_points[i][0]), int(top_points[i][1]))
+                print((u, v))
+                # 画像内に指定したクラス(results[0]の境界線を赤点で描画
+                cv2.circle(img, (u, v), 10, (0, 0, 255), -1)
             
-            # Calculate median point
-            median_x = int(np.median([p[0] for p in point]))
-            median_y = int(np.median([p[1] for p in point]))
+            # 上位50個の座標の中から最もy座標が高い2つの点を選びu1u2などをそれに当てる
+            (u1, v1) = (int(top_points[0][0]), int(top_points[0][1]))
+            (u2, v2) = (int(top_points[1][0]), int(top_points[1][1]))
+
+            # 上位50個の座標の中央値を算出
+            median_x = int(np.median([p[0] for p in top_points]))
+            median_y = int(np.median([p[1] for p in top_points]))
 
             # Get depth at median point
             depth = img_depth[median_y, median_x]
@@ -78,10 +123,14 @@ class SlopeDetection:
                 x = z / fx * (median_x - cx)
                 y = z / fy * (median_y - cy)
 
-                rospy.loginfo(f'Slope 3D Coordinate: ({x:.3f}, {y:.3f}, {z:.3f})')
-                
+                # 距離に変換
+                dis_x = x ** 2
+                dis_y = y ** 2
+                dis_z = z ** 2
+                dis = np.sqrt(dis_x + dis_y + dis_z)
+                rospy.loginfo(f'{frame_id} ({dis:.3f})')
                 # Write to CSV
-                self.csv_writer.writerow([x, y, z])
+                self.csv_writer.writerow([frame_id, x, y, z, f'{dis:.3f}'])
 
                 # Broadcast transform
                 ts = TransformStamped()
