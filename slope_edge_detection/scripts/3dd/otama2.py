@@ -77,10 +77,10 @@ class SlopeDetection:
             point = result
 
             # PIL Imageをnumpy配列に変換
-            img = np.array(img)
+            img_color = np.array(img_color)
 
             # OpenCVで使用するためにRGBからBGRに変換
-            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+            img_color = cv2.cvtColor(img_color, cv2.COLOR_RGB2BGR)
 
             #y座標が高い順にソート
             '''
@@ -100,7 +100,7 @@ class SlopeDetection:
                 (u, v) = (int(top_points[i][0]), int(top_points[i][1]))
                 print((u, v))
                 # 画像内に指定したクラス(results[0]の境界線を赤点で描画
-                cv2.circle(img, (u, v), 10, (0, 0, 255), -1)
+                cv2.circle(img_color, (u, v), 10, (0, 0, 255), -1)
             
             # 上位50個の座標の中から最もy座標が高い2つの点を選びu1u2などをそれに当てる
             (u1, v1) = (int(top_points[0][0]), int(top_points[0][1]))
@@ -128,7 +128,7 @@ class SlopeDetection:
                 dis_y = y ** 2
                 dis_z = z ** 2
                 dis = np.sqrt(dis_x + dis_y + dis_z)
-                rospy.loginfo(f'{frame_id} ({dis:.3f})')
+                rospy.loginfo(f'{self.frame_id} ({dis:.3f})')
                 # Write to CSV
                 self.csv_writer.writerow([frame_id, x, y, z, f'{dis:.3f}'])
 
