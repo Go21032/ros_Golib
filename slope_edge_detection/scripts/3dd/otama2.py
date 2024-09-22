@@ -25,7 +25,7 @@ class SlopeDetection:
         self.sub_depth = Subscriber('camera/aligned_depth_to_color/image_raw', Image)
         
         # 画像とカメラ情報のトピックを同期させる
-        self.ts = ApproximateTimeSynchronizer([self.sub_info, self.sub_color, self.sub_depth], 10, 0.1)
+        self.ts = ApproximateTimeSynchronizer([self.sub_info, self.sub_color, self.sub_depth], 20, 0.1)
         self.ts.registerCallback(self.images_callback)
         
         # Transform broadcaster
@@ -50,99 +50,109 @@ class SlopeDetection:
             rospy.logwarn('カラーと深度の画像サイズが異なる')
             return
 
+        #映像出力
+        cv2.imshow('color', img_color)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            rospy.signal_shutdown('closed')
+            return
+            
         # Use YOLO model to detect slope
         pil_img = PilImage.fromarray(cv2.cvtColor(img_color, cv2.COLOR_BGR2RGB))
         results = self.model.predict(source=pil_img)
         masks = results[0].masks
 
-        if masks:
-            masks = results[0].masks
-            x_numpy = masks[0].data.to('cpu').detach().numpy().copy()
-            print(x_numpy.shape)
+        # 予測結果がない場合の処理
+        if not results or not results[0].masks:
+            rospy.logwarn("予測結果が存在しません")
+            return
+        masks = results[0].masks
+        x_numpy = masks[0].data.to('cpu').detach().numpy().copy()
+        #print(x_numpy.shape)
 
-            name = results[0].names
-            print(name)   
-            point = masks[0].xy
-            point = np.array(point)
+        name = results[0].names
+        #print(name)   
+        point = masks[0].xy
+        point = np.array(point)
 
-            # ３次元を２次元に変換する
-            result = []
-            for i in range(len(point)):
-                for j in range(len(point[i])):
-                    my_list = []
-                    for k in range(len(point[i][j])):
-                        my_list.append(point[i][j][k])
-                    result.append(my_list)
-            result = np.array(result)
-            point = result
+        # ３次元を２次元に変換する
+        result = []
+        for i in range(len(point)):
+            for j in range(len(point[i])):
+                my_list = []
+                for k in range(len(point[i][j])):
+                    my_list.append(point[i][j][k])
+                result.append(my_list)
+        result = np.array(result)
+        point = result
 
-            # PIL Imageをnumpy配列に変換
-            img_color = np.array(img_color)
+        # PIL Imageをnumpy配列に変換
+        img_color = np.array(img_color)
 
-            # OpenCVで使用するためにRGBからBGRに変換
-            img_color = cv2.cvtColor(img_color, cv2.COLOR_RGB2BGR)
+        # OpenCVで使用するためにRGBからBGRに変換
+        img_color = cv2.cvtColor(img_color, cv2.COLOR_RGB2BGR)
 
-            #y座標が高い順にソート
-            '''
-            sorted() は、リストを特定の順序でソートするためのPythonの組み込み関数。
-            point はソートしたいリストです。このリストは、各要素が座標（[x, y] の形）を表している。
-            key=lambda x: x[1] は、ソートの基準となるキーを指定します。ここでは、各要素（座標）のy座標（インデックス1の値）を基準にソートしている。
-            x は point リストの各要素を指します。各要素は座標であり、今回は[u, v] という形。
-            x: x[1] は、リストの各要素 x のインデックス1の値（つまり y 座標）を返す。
-            '''
-            point = sorted(point, key=lambda x: x[1], reverse=True)
+        #y座標が高い順にソート
+        '''
+        sorted() は、リストを特定の順序でソートするためのPythonの組み込み関数。
+        point はソートしたいリストです。このリストは、各要素が座標（[x, y] の形）を表している。
+        key=lambda x: x[1] は、ソートの基準となるキーを指定します。ここでは、各要素（座標）のy座標（インデックス1の値）を基準にソートしている。
+        x は point リストの各要素を指します。各要素は座標であり、今回は[u, v] という形。
+        x: x[1] は、リストの各要素 x のインデックス1の値（つまり y 座標）を返す。
+        '''
+        point = sorted(point, key=lambda x: x[1], reverse=True)
 
-            # 上位50個のy座標が高い座標を取得
-            top_points = point[:50]
+        # 上位50個のy座標が高い座標を取得
+        top_points = point[:50]
 
-            # 座標の表示
-            for i in range(len(top_points)):
-                (u, v) = (int(top_points[i][0]), int(top_points[i][1]))
-                print((u, v))
-                # 画像内に指定したクラス(results[0]の境界線を赤点で描画
-                cv2.circle(img_color, (u, v), 10, (0, 0, 255), -1)
-            
-            # 上位50個の座標の中から最もy座標が高い2つの点を選びu1u2などをそれに当てる
-            (u1, v1) = (int(top_points[0][0]), int(top_points[0][1]))
-            (u2, v2) = (int(top_points[1][0]), int(top_points[1][1]))
+        # 座標の表示
+        for i in range(len(top_points)):
+            (u, v) = (int(top_points[i][0]), int(top_points[i][1]))
+            #print((u, v))
+            # 画像内に指定したクラス(results[0]の境界線を赤点で描画
+            cv2.circle(img_color, (u, v), 10, (0, 0, 255), -1)
+        
+        # 上位50個の座標の中から最もy座標が高い2つの点を選びu1u2などをそれに当てる
+        (u1, v1) = (int(top_points[0][0]), int(top_points[0][1]))
+        (u2, v2) = (int(top_points[1][0]), int(top_points[1][1]))
 
-            # 上位50個の座標の中央値を算出
-            median_x = int(np.median([p[0] for p in top_points]))
-            median_y = int(np.median([p[1] for p in top_points]))
+        # 上位50個の座標の中央値を算出
+        median_x = int(np.median([p[0] for p in top_points]))
+        median_y = int(np.median([p[1] for p in top_points]))
 
-            # Get depth at median point
-            depth = img_depth[median_y, median_x]
+        # Get depth at median point
+        depth = img_depth[median_y, median_x]
 
-            if depth != 0:
-                z = depth * 1e-3
-                fx = msg_info.K[0]
-                fy = msg_info.K[4]
-                cx = msg_info.K[2]
-                cy = msg_info.K[5]
+        if depth != 0:
+            z = depth * 1e-3
+            fx = msg_info.K[0]
+            fy = msg_info.K[4]
+            cx = msg_info.K[2]
+            cy = msg_info.K[5]
 
-                x = z / fx * (median_x - cx)
-                y = z / fy * (median_y - cy)
+            x = z / fx * (median_x - cx)
+            y = z / fy * (median_y - cy)
 
-                # 距離に変換
-                dis_x = x ** 2
-                dis_y = y ** 2
-                dis_z = z ** 2
-                dis = np.sqrt(dis_x + dis_y + dis_z)
-                rospy.loginfo(f'{self.frame_id} ({dis:.3f})')
-                # Write to CSV
-                self.csv_writer.writerow([frame_id, x, y, z, f'{dis:.3f}'])
+            # 距離に変換
+            dis_x = x ** 2
+            dis_y = y ** 2
+            dis_z = z ** 2
+            dis = np.sqrt(dis_x + dis_y + dis_z)
+            rospy.loginfo(f'{self.frame_id} ({dis:.3f})')
+            # Write to CSV
+            self.csv_writer.writerow([self.frame_id, x, y, z, f'{dis:.3f}'])
 
-                # Broadcast transform
-                ts = TransformStamped()
-                ts.header = msg_depth.header
-                ts.child_frame_id = self.frame_id
-                ts.transform.translation.x = x
-                ts.transform.translation.y = y
-                ts.transform.translation.z = z
-                self.broadcaster.sendTransform((x, y, z), (0, 0, 0, 1), rospy.Time.now(), self.frame_id, msg_depth.header.frame_id)
+            # Broadcast transform
+            ts = TransformStamped()
+            ts.header = msg_depth.header
+            ts.child_frame_id = self.frame_id
+            ts.transform.translation.x = x
+            ts.transform.translation.y = y
+            ts.transform.translation.z = z
+            self.broadcaster.sendTransform((x, y, z), (0, 0, 0, 1), rospy.Time.now(), self.frame_id, msg_depth.header.frame_id)
 
     def __del__(self):
         self.csv_file.close()
+        cv2.destroyAllWindows()
 
 if __name__ == '__main__':
     rospy.init_node('slope_detection')
