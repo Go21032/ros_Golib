@@ -59,18 +59,16 @@ class SlopeDetection:
         # Use YOLO model to detect slope
         pil_img = PilImage.fromarray(cv2.cvtColor(img_color, cv2.COLOR_BGR2RGB))
         results = self.model.predict(source=pil_img)
-        masks = results[0].masks
 
         # 予測結果がない場合の処理
         if not results or not results[0].masks:
             rospy.logwarn("予測結果が存在しません")
             return
+
         masks = results[0].masks
         x_numpy = masks[0].data.to('cpu').detach().numpy().copy()
-        #print(x_numpy.shape)
 
         name = results[0].names
-        #print(name)   
         point = masks[0].xy
         point = np.array(point)
 
@@ -82,23 +80,9 @@ class SlopeDetection:
                 for k in range(len(point[i][j])):
                     my_list.append(point[i][j][k])
                 result.append(my_list)
-        result = np.array(result)
-        point = result
-
-        # PIL Imageをnumpy配列に変換
-        img_color = np.array(img_color)
-
-        # OpenCVで使用するためにRGBからBGRに変換
-        img_color = cv2.cvtColor(img_color, cv2.COLOR_RGB2BGR)
+        point = np.array(result)
 
         #y座標が高い順にソート
-        '''
-        sorted() は、リストを特定の順序でソートするためのPythonの組み込み関数。
-        point はソートしたいリストです。このリストは、各要素が座標（[x, y] の形）を表している。
-        key=lambda x: x[1] は、ソートの基準となるキーを指定します。ここでは、各要素（座標）のy座標（インデックス1の値）を基準にソートしている。
-        x は point リストの各要素を指します。各要素は座標であり、今回は[u, v] という形。
-        x: x[1] は、リストの各要素 x のインデックス1の値（つまり y 座標）を返す。
-        '''
         point = sorted(point, key=lambda x: x[1], reverse=True)
 
         # 上位50個のy座標が高い座標を取得
@@ -107,7 +91,6 @@ class SlopeDetection:
         # 座標の表示
         for i in range(len(top_points)):
             (u, v) = (int(top_points[i][0]), int(top_points[i][1]))
-            #print((u, v))
             # 画像内に指定したクラス(results[0]の境界線を赤点で描画
             cv2.circle(img_color, (u, v), 10, (0, 0, 255), -1)
         
