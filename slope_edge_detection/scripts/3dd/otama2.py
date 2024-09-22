@@ -51,10 +51,10 @@ class SlopeDetection:
             return
 
         #映像出力
-        cv2.imshow('color', img_color)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            rospy.signal_shutdown('closed')
-            return
+        # cv2.imshow('color', img_color)
+        # if cv2.waitKey(1) & 0xFF == ord('q'):
+        #     rospy.signal_shutdown('closed')
+        #     return
             
         # Use YOLO model to detect slope
         pil_img = PilImage.fromarray(cv2.cvtColor(img_color, cv2.COLOR_BGR2RGB))
@@ -135,8 +135,7 @@ class SlopeDetection:
 
     def __del__(self):
         self.csv_file.close()
-        cv2.destroyAllWindows()
-
+        
 if __name__ == '__main__':
     rospy.init_node('slope_detection')
     model_path = "/home/go/slope_ws/src/ros_Golib/slope_edge_detection/scripts/best.pt"
