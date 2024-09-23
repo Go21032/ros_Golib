@@ -18,7 +18,7 @@ class SlopeDetection:
     def __init__(self, model_path):
         self.model = YOLO(model_path)
         self.bridge = CvBridge()
-        self.frame_id = 'handrail'
+        self.frame_id = 'slope'
         
         self.sub_info = Subscriber('camera/aligned_depth_to_color/camera_info', CameraInfo)
         self.sub_color = Subscriber('camera/color/image_raw', Image)
@@ -96,11 +96,11 @@ class SlopeDetection:
         median_y = int(np.median([p[1] for p in top_points]))
         cv2.circle(img_color, (median_x, median_y), 10, (255, 0, 0), -1)
         
-        #映像出力
-        cv2.imshow('color', img_color)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            rospy.signal_shutdown('closed')
-            return
+        #映像出力rosbag playでやるときのみ外す
+        # cv2.imshow('color', img_color)
+        # if cv2.waitKey(1) & 0xFF == ord('q'):
+        #     rospy.signal_shutdown('closed')
+        #     return
 
         # Get depth at median point
         depth = img_depth[median_y, median_x]
@@ -111,7 +111,6 @@ class SlopeDetection:
             fy = msg_info.K[4]
             cx = msg_info.K[2]
             cy = msg_info.K[5]
-
             x = z / fx * (median_x - cx)
             y = z / fy * (median_y - cy)
 
