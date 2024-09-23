@@ -18,7 +18,7 @@ class SlopeDetection:
     def __init__(self, model_path):
         self.model = YOLO(model_path)
         self.bridge = CvBridge()
-        self.frame_id = 'slope'
+        self.frame_id = 'handrail'
         
         self.sub_info = Subscriber('camera/aligned_depth_to_color/camera_info', CameraInfo)
         self.sub_color = Subscriber('camera/color/image_raw', Image)
@@ -49,12 +49,6 @@ class SlopeDetection:
         if img_color.shape[0:2] != img_depth.shape[0:2]:
             rospy.logwarn('カラーと深度の画像サイズが異なる')
             return
-
-        #映像出力
-        # cv2.imshow('color', img_color)
-        # if cv2.waitKey(1) & 0xFF == ord('q'):
-        #     rospy.signal_shutdown('closed')
-        #     return
             
         # Use YOLO model to detect slope
         pil_img = PilImage.fromarray(cv2.cvtColor(img_color, cv2.COLOR_BGR2RGB))
@@ -93,7 +87,6 @@ class SlopeDetection:
             (u, v) = (int(top_points[i][0]), int(top_points[i][1]))
             # 画像内に指定したクラス(results[0]の境界線を赤点で描画
             cv2.circle(img_color, (u, v), 10, (0, 0, 255), -1)
-        
         # 上位50個の座標の中から最もy座標が高い2つの点を選びu1u2などをそれに当てる
         (u1, v1) = (int(top_points[0][0]), int(top_points[0][1]))
         (u2, v2) = (int(top_points[1][0]), int(top_points[1][1]))
@@ -101,6 +94,13 @@ class SlopeDetection:
         # 上位50個の座標の中央値を算出
         median_x = int(np.median([p[0] for p in top_points]))
         median_y = int(np.median([p[1] for p in top_points]))
+        cv2.circle(img_color, (median_x, median_y), 10, (255, 0, 0), -1)
+        
+        #映像出力
+        cv2.imshow('color', img_color)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            rospy.signal_shutdown('closed')
+            return
 
         # Get depth at median point
         depth = img_depth[median_y, median_x]
