@@ -36,16 +36,25 @@ class SlopeDetection:
         file_name = f'slope_3次元座標{current_time}.csv'
         self.csv_file = open(file_name, 'w', newline='')
         self.csv_writer = csv.writer(self.csv_file)
-        self.csv_writer.writerow(['name', 'X', 'Y', 'Z', 'distance'])
+        self.csv_writer.writerow(['name', 'X', 'Y', 'Z', 'distance', 'grand_dis'])
 
     def images_callback(self, msg_info, msg_color, msg_depth):
         try:
             img_color = self.bridge.imgmsg_to_cv2(msg_color, 'bgr8')
             img_depth = self.bridge.imgmsg_to_cv2(msg_depth, 'passthrough').copy()
+            
+            # 地面の中央のピクセルの距離を取得
+            height, width = img_depth.shape
+            center_distance = img_depth[height // 2, width // 2] /1000
+            print(f"中央の距離: {center_distance:.2f} メートル")
+            self.csv_writer.writerow([self.frame_id, x, y, z, f'{dis:.3f}'])
+            
         except CvBridgeError as e:
             rospy.logwarn(str(e))
             return
-
+        except Exception as e:
+            print(f"変換エラー: {e}")
+        
         if img_color.shape[0:2] != img_depth.shape[0:2]:
             rospy.logwarn('カラーと深度の画像サイズが異なる')
             return
@@ -58,34 +67,7 @@ class SlopeDetection:
         if not results or not results[0].masks:
             rospy.logwarn("予測結果が存在しません")
             return
-        for detection in results[0].detections:
-            # バウンディングボックスの中心を計算
-            x_min, y_min, x_max, y_max = detection.xyxy
-            center_x = int((x_min + x_max) / 2)
-            center_y = int((y_min + y_max) / 2)
-            cv2.circle(img_color, (center_x, center_y), 10, (255, 0, 0), -1)
-
-            # 中心点の深度を取得
-            depth = img_depth[center_y, center_x]
-
-            if depth != 0:
-                z = depth * 1e-3
-                fx = msg_info.K[0]
-                fy = msg_info.K[4]
-                cx = msg_info.K[2]
-                cy = msg_info.K[5]
-                x = z / fx * (center_x - cx)
-                y = z / fy * (center_y - cy)
-                
-                dis_x = x ** 2
-                dis_y = y ** 2
-                dis_z = z ** 2
-                dis = np.sqrt(dis_x + dis_y + dis_z)
-                rospy.loginfo(f'{self.frame_id} ({jud_dis:.3f})')
-                
-                # CSVファイルに検出された対象の情報を書き込み
-                self.csv_writer.writerow([self.frame_id, f'{dis:.3f}'])
-            
+        
         masks = results[0].masks
         x_numpy = masks[0].data.to('cpu').detach().numpy().copy()
 
