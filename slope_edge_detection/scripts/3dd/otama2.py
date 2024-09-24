@@ -58,7 +58,34 @@ class SlopeDetection:
         if not results or not results[0].masks:
             rospy.logwarn("予測結果が存在しません")
             return
+        for detection in results[0].detections:
+            # バウンディングボックスの中心を計算
+            x_min, y_min, x_max, y_max = detection.xyxy
+            center_x = int((x_min + x_max) / 2)
+            center_y = int((y_min + y_max) / 2)
+            cv2.circle(img_color, (center_x, center_y), 10, (255, 0, 0), -1)
 
+            # 中心点の深度を取得
+            depth = img_depth[center_y, center_x]
+
+            if depth != 0:
+                z = depth * 1e-3
+                fx = msg_info.K[0]
+                fy = msg_info.K[4]
+                cx = msg_info.K[2]
+                cy = msg_info.K[5]
+                x = z / fx * (center_x - cx)
+                y = z / fy * (center_y - cy)
+                
+                dis_x = x ** 2
+                dis_y = y ** 2
+                dis_z = z ** 2
+                dis = np.sqrt(dis_x + dis_y + dis_z)
+                rospy.loginfo(f'{self.frame_id} ({jud_dis:.3f})')
+                
+                # CSVファイルに検出された対象の情報を書き込み
+                self.csv_writer.writerow([self.frame_id, f'{dis:.3f}'])
+            
         masks = results[0].masks
         x_numpy = masks[0].data.to('cpu').detach().numpy().copy()
 
