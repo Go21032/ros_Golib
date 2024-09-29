@@ -3,8 +3,8 @@ from sensor_msgs.msg import Image, CameraInfo
 from cv_bridge import CvBridge
 import numpy as np
 import open3d as o3d
-import cv2
 import datetime
+import cv2
 
 # グローバル変数の定義
 color_image = None
@@ -35,29 +35,21 @@ rospy.Subscriber('/camera/color/camera_info', CameraInfo, camera_info_callback)
 
 # Open3Dの設定
 vis = o3d.visualization.Visualizer()
-vis.create_window('PCD', width=960, height=720)
+vis.create_window('PCD', width=640, height=480)
 pointcloud = o3d.geometry.PointCloud()
 geom_added = False
-
-# 深度スケール設定
-depth_scale = 0.001  # 深度画像をメートルに変換するスケール
 
 try:
     while not rospy.is_shutdown():
         if color_image is None or depth_image is None or intrinsics is None:
-            rospy.sleep(0.1)
             continue
 
         dt0 = datetime.datetime.now()
 
-        # 深度画像のスケールを適用
-        depth_image_scaled = depth_image * depth_scale
-
         o3d_color_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB)
-        img_depth = o3d.geometry.Image(depth_image_scaled.astype(np.float32))
+        img_depth = o3d.geometry.Image(depth_image)
         img_color = o3d.geometry.Image(o3d_color_image)
-        rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
-            img_color, img_depth, depth_scale=5.0, depth_trunc=5.0, convert_rgb_to_intensity=False)
+        rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(img_color, img_depth, convert_rgb_to_intensity=False)
 
         pinhole_camera_intrinsic = o3d.camera.PinholeCameraIntrinsic(
             intrinsics.width, intrinsics.height, intrinsics.K[0], intrinsics.K[4], intrinsics.K[2], intrinsics.K[5])
@@ -65,8 +57,24 @@ try:
         pcd = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd, pinhole_camera_intrinsic)
         pcd.transform([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
 
-        pointcloud.points = pcd.points
-        pointcloud.colors = pcd.colors
+        # NumPy配列に変換
+        points = np.asarray(pcd.points)
+
+        # x座標でのフィルタリング
+        pass_x = (points[:, 0] > -10.0) & (points[:, 0] < 10.0)
+        cloud_passthrough_x = points[pass_x]
+
+        # y座標でのフィルタリング
+        pass_y = (cloud_passthrough_x[:, 1] > -10.0) & (cloud_passthrough_x[:, 1] < 10.0)
+        cloud_passthrough = cloud_passthrough_x[pass_y]
+
+        # フィルタリング後の点群を更新
+        filtered_pcd = o3d.geometry.PointCloud()
+        filtered_pcd.points = o3d.utility.Vector3dVector(cloud_passthrough)
+        filtered_pcd.colors = o3d.utility.Vector3dVector(np.asarray(pcd.colors)[pass_x][pass_y])
+
+        pointcloud.points = filtered_pcd.points
+        pointcloud.colors = filtered_pcd.colors
 
         if not geom_added:
             vis.add_geometry(pointcloud)
@@ -76,13 +84,14 @@ try:
 
         vis.poll_events()
         vis.update_renderer()
-
+    
         cv2.imshow('bgr', color_image)
         key = cv2.waitKey(1)
         if key == ord('q'):
             break
 
         process_time = datetime.datetime.now() - dt0
+
 finally:
     o3d.io.write_point_cloud("output2.ply", pointcloud)
     cv2.destroyAllWindows()

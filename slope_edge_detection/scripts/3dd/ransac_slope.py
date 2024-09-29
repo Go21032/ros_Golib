@@ -12,6 +12,8 @@ from message_filters import Subscriber, ApproximateTimeSynchronizer
 from tf import TransformBroadcaster
 from ultralytics import YOLO
 from PIL import Image as PilImage
+import open3d as o3d
+import cv2.cuda as cv2_cuda
 
 class SlopeDetection:
 
@@ -38,16 +40,20 @@ class SlopeDetection:
         self.csv_writer = csv.writer(self.csv_file)
         self.csv_writer.writerow(['name', 'X', 'Y', 'Z', 'distance', 'grand_dis'])
 
+        # Open3Dの設定
+        vis = o3d.visualization.Visualizer()
+        vis.create_window('PCD', width=640, height=480)
+        pointcloud = o3d.geometry.PointCloud()
+        geom_added = False
+
+        # ループ内の処理を制限
+        rate = rospy.Rate(10)  # 10Hzに設定
+
     def images_callback(self, msg_info, msg_color, msg_depth):
         try:
             img_color = self.bridge.imgmsg_to_cv2(msg_color, 'bgr8')
             img_depth = self.bridge.imgmsg_to_cv2(msg_depth, 'passthrough').copy()
-            
-            # 地面の中央のピクセルの距離を取得
-            height, width = img_depth.shape
-            center_distance = img_depth[height // 2, width // 2] /1000
-            print(f"中央の距離: {center_distance:.2f} メートル")
-            
+           
         except CvBridgeError as e:
             rospy.logwarn(str(e))
             return
@@ -57,7 +63,42 @@ class SlopeDetection:
         if img_color.shape[0:2] != img_depth.shape[0:2]:
             rospy.logwarn('カラーと深度の画像サイズが異なる')
             return
-            
+         # Open3D の処理
+        img_depth_o3d = o3d.geometry.Image(img_depth)
+        img_color_o3d = o3d.geometry.Image(cv2.cvtColor(img_color, cv2.COLOR_BGR2RGB))
+        rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(img_color_o3d, img_depth_o3d, convert_rgb_to_intensity=False)
+        
+        pinhole_camera_intrinsic = o3d.camera.PinholeCameraIntrinsic(
+            msg_info.width, msg_info.height, msg_info.K[0], msg_info.K[4], msg_info.K[2], msg_info.K[5])
+        
+        pcd = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd, pinhole_camera_intrinsic)
+        pcd.transform([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
+
+        points = np.asarray(pcd.points)
+        pass_x = (points[:, 0] > -1.0) & (points[:, 0] < 1.0)
+        pass_y = (points[:, 1] > -1.0) & (points[:, 1] < 1.0)
+        filtered_indices = np.where(pass_x & pass_y)[0]
+
+        filtered_pcd = pcd.select_by_index(filtered_indices)
+
+        if len(filtered_pcd.points) > 0:
+            plane_model, inliers = filtered_pcd.segment_plane(distance_threshold=0.01, ransac_n=3, num_iterations=1000)
+            inlier_cloud = filtered_pcd.select_by_index(inliers)
+            inlier_cloud.paint_uniform_color([1.0, 0, 0])
+            outlier_cloud = filtered_pcd.select_by_index(inliers, invert=True)
+
+            self.pointcloud.points = filtered_pcd.points
+            self.pointcloud.colors = filtered_pcd.colors
+
+            if not self.geom_added:
+                self.vis.add_geometry(self.pointcloud)
+                self.geom_added = True
+            else:
+                self.vis.update_geometry(self.pointcloud)
+
+            self.vis.poll_events()
+            self.vis.update_renderer()
+   
         # Use YOLO model to detect slope
         pil_img = PilImage.fromarray(cv2.cvtColor(img_color, cv2.COLOR_BGR2RGB))
         results = self.model.predict(source=pil_img)
@@ -204,5 +245,8 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         if node.csv_file:
             node.csv_file.close()
-        pass
-    rospy.signal_shutdown('KeyboardInterrupt')
+    finally:
+        o3d.io.write_point_cloud("output2.ply", pointcloud)
+        cv2.destroyAllWindows()
+        vis.destroy_window()
+        rospy.signal_shutdown('KeyboardInterrupt')

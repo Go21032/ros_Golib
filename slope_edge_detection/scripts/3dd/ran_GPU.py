@@ -5,6 +5,8 @@ import numpy as np
 import open3d as o3d
 import datetime
 import cv2
+# CUDAモジュールをインポート
+import cv2.cuda as cv2_cuda
 
 # グローバル変数の定義
 color_image = None
@@ -52,8 +54,13 @@ try:
 
         dt0 = datetime.datetime.now()
 
-        # 画像変換を事前に行う
-        o3d_color_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB)
+        # CUDAを利用して画像を処理
+        gpu_color_image = cv2_cuda.GpuMat()
+        gpu_color_image.upload(color_image)
+        gpu_rgb_image = cv2_cuda.cvtColor(gpu_color_image, cv2.COLOR_BGR2RGB)
+        o3d_color_image = gpu_rgb_image.download()
+
+        # Open3Dの処理
         img_depth = o3d.geometry.Image(depth_image)
         img_color = o3d.geometry.Image(o3d_color_image)
         rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(img_color, img_depth, convert_rgb_to_intensity=False)
@@ -76,13 +83,27 @@ try:
         # 平面検出の実行
         if len(filtered_pcd.points) > 0:
             plane_model, inliers = filtered_pcd.segment_plane(distance_threshold=0.01, ransac_n=3, num_iterations=1000)
+            # 平面モデルの係数を出力
+            [a, b, c, d] = plane_model
+
+            # # 平面の法線ベクトル
+            # normal_vector = np.array([a, b, c])
+            # # 傾きの計算（Z軸に対する角度）
+            # z_axis = np.array([0, 0, 1])
+            # angle = np.arccos(np.dot(normal_vector, z_axis) / np.linalg.norm(normal_vector))
+            # angle_degrees = np.degrees(angle)
+            # rospy.loginfo(f"平面の傾き: {angle_degrees:.2f}度")
+
+            # インライアの点を抽出して色を付ける
             inlier_cloud = filtered_pcd.select_by_index(inliers)
             inlier_cloud.paint_uniform_color([1.0, 0, 0])
+            # 平面以外の点を抽出
             outlier_cloud = filtered_pcd.select_by_index(inliers, invert=True)
 
             pointcloud.points = filtered_pcd.points
             pointcloud.colors = filtered_pcd.colors
 
+            # リアルタイムで可視化
             if not geom_added:
                 vis.add_geometry(pointcloud)
                 geom_added = True
@@ -91,11 +112,6 @@ try:
 
             vis.poll_events()
             vis.update_renderer()
-
-        # cv2.imshow('bgr', color_image)
-        # key = cv2.waitKey(1)
-        # if key == ord('q'):
-        #     break
 
         process_time = datetime.datetime.now() - dt0
         rate.sleep()
