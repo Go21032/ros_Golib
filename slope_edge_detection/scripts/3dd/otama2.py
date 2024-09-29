@@ -145,8 +145,8 @@ class SlopeDetection:
             cv2.circle(img_color, (median_x, median_y), 10, (255, 0, 0), -1)  
             """  
             
-            """
-            元のやつ
+            
+            #元のやつ
             # 上位50個の座標の中から最もy座標が高い2つの点を選びu1u2などをそれに当てる
             top_points_sorted = sorted(top_points, key=lambda p: p[1], reverse=True)
             (u1, v1) = (int(top_points[0][0]), int(top_points[0][1]))
@@ -156,7 +156,7 @@ class SlopeDetection:
             median_x = int(np.median([p[0] for p in top_points_sorted]))
             median_y = int(np.median([p[1] for p in top_points_sorted]))
             cv2.circle(img_color, (median_x, median_y), 10, (255, 0, 0), -1)
-            """          
+                 
                         
             #映像出力rosbag playでやるときのみ外す
             cv2.imshow('color', img_color)
@@ -199,7 +199,7 @@ class SlopeDetection:
         
 if __name__ == '__main__':
     rospy.init_node('slope_detection')
-    model_path = "/home/go/slope_ws/src/ros_Golib/slope_edge_detection/scripts/best.pt"
+    model_path = "/home/carsim/gakuhari_ws/src/ros_Golib/slope_edge_detection/scripts/best.pt"
     node = SlopeDetection(model_path)
     try:
         rospy.spin()
