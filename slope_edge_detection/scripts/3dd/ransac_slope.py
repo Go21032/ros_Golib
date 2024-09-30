@@ -14,14 +14,12 @@ from datetime import datetime
 from PIL import Image as PilImage
 import sys
 
-# グローバル変数の定義
-img_color = None
-img_depth = None
-intrinsics = None
-
 class SlopeDetection:
 
     def __init__(self, model_path):
+        self.color_image = None
+        self.depth_image = None
+        self.intrinsics = None
         self.model = YOLO(model_path)
         self.bridge = CvBridge()
         self.frame_id = 'slope'
