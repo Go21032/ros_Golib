@@ -79,26 +79,30 @@ try:
         # 平面検出の実行
         if len(filtered_pcd.point.positions) > 0:
             plane_model, inliers = filtered_pcd.segment_plane(distance_threshold=0.01, ransac_n=3, num_iterations=1000)
+            # 平面モデルの係数を出力
+            [a, b, c, d] = plane_model
             inlier_cloud = filtered_pcd.select_by_mask(inliers)
             inlier_cloud.paint_uniform_color([1.0, 0, 0])
             outlier_cloud = filtered_pcd.select_by_mask(inliers, invert=True)
 
-            pointcloud.point.positions = filtered_pcd.point.positions
-            pointcloud.point.colors = filtered_pcd.point.colors
+            # Legacy PointCloudに変換
+            legacy_pcd = filtered_pcd.to_legacy()
 
             if not geom_added:
-                vis.add_geometry(pointcloud.to_legacy())
+                vis.add_geometry(legacy_pcd)
                 geom_added = True
             else:
-                vis.update_geometry(pointcloud.to_legacy())
+                vis.update_geometry(legacy_pcd)
 
             vis.poll_events()
             vis.update_renderer()
+
 
         process_time = datetime.datetime.now() - dt0
         rate.sleep()
 
 finally:
-    o3d.io.write_point_cloud("output2.ply", pointcloud.to_legacy())
+    if 'legacy_pcd' in locals():
+        o3d.io.write_point_cloud("output2.ply", legacy_pcd)
     cv2.destroyAllWindows()
     vis.destroy_window()

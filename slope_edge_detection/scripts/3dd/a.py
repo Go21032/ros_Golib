@@ -12,7 +12,6 @@ from message_filters import Subscriber, ApproximateTimeSynchronizer
 from tf import TransformBroadcaster
 from ultralytics import YOLO
 from PIL import Image as PilImage
-import open3d as o3d
 
 class SlopeDetection:
 
@@ -38,15 +37,6 @@ class SlopeDetection:
         self.csv_file = open(file_name, 'w', newline='')
         self.csv_writer = csv.writer(self.csv_file)
         self.csv_writer.writerow(['name', 'X', 'Y', 'Z', 'median_x', 'median_y'])
-
-        # Open3Dの設定
-        vis = o3d.visualization.Visualizer()
-        vis.create_window('PCD', width=640, height=480)
-        pointcloud = o3d.geometry.PointCloud()
-        geom_added = False
-
-        # ループ内の処理を制限
-        rate = rospy.Rate(10)  # 10Hzに設定
 
     def images_callback(self, msg_info, msg_color, msg_depth):
         try:
@@ -76,57 +66,6 @@ class SlopeDetection:
         mask_confidences = results[0].boxes.conf
         print("信頼度:", mask_confidences)
         
-         # 画像変換を事前に行う
-        o3d_color_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB)
-        img_depth = o3d.geometry.Image(depth_image)
-        img_color = o3d.geometry.Image(o3d_color_image)
-        rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(img_color, img_depth, convert_rgb_to_intensity=False)
-
-        pinhole_camera_intrinsic = o3d.camera.PinholeCameraIntrinsic(
-            intrinsics.width, intrinsics.height, intrinsics.K[0], intrinsics.K[4], intrinsics.K[2], intrinsics.K[5])
-
-        pcd = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd, pinhole_camera_intrinsic)
-        pcd.transform([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
-
-        # フィルタリングのインデックスを毎回計算
-        points = np.asarray(pcd.points)
-        pass_x = (points[:, 0] > -1.0) & (points[:, 0] < 1.0)
-        pass_y = (points[:, 1] > -1.0) & (points[:, 1] < 1.0)
-        filtered_indices = np.where(pass_x & pass_y)[0]
-
-        # フィルタリング後の点群を更新
-        filtered_pcd = pcd.select_by_index(filtered_indices)
-        filtered_pcd = filtered_pcd.voxel_down_sample(voxel_size=0.005)  # 点群をダウンサンプリング
-
-        # 平面検出の実行
-        if len(filtered_pcd.points) > 0:
-            plane_model, inliers = filtered_pcd.segment_plane(distance_threshold=0.01, ransac_n=30, num_iterations=100)
-            # 平面モデルの係数を出力
-            [a, b, c, d] = plane_model
-            inlier_cloud = filtered_pcd.select_by_index(inliers)
-            # インライアの点を抽出して色を付ける
-            inlier_cloud.paint_uniform_color([1.0, 0, 0])
-            # 平面以外の点を抽出
-            outlier_cloud = filtered_pcd.select_by_index(inliers, invert=True)
-
-            # インライアとアウトライアの点群を結合
-            combined_points = np.vstack((np.asarray(inlier_cloud.points), np.asarray(outlier_cloud.points)))
-            combined_colors = np.vstack((np.asarray(inlier_cloud.colors), np.asarray(outlier_cloud.colors)))
-
-            # 点群を更新
-            pointcloud.points = o3d.utility.Vector3dVector(combined_points)
-            pointcloud.colors = o3d.utility.Vector3dVector(combined_colors)
-
-            if not geom_added:
-                vis.add_geometry(pointcloud)
-                geom_added = True
-            else:
-                vis.update_geometry(pointcloud)
-
-            vis.poll_events()
-            vis.update_renderer()
-
-        rate.sleep()
         # 信頼度が90%以上か確認
         if results[0].boxes and results[0].boxes.conf[0] > 0.8
             masks = results[0].masks
