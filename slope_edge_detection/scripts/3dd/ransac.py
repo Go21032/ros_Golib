@@ -70,44 +70,55 @@ try:
         filtered_pcd = pcd.select_by_index(filtered_indices)
         filtered_pcd = filtered_pcd.voxel_down_sample(voxel_size=0.005)  # 点群をダウンサンプリング
 
-        # 複数の平面を検出する
-        plane_segments = []
-        while len(filtered_pcd.points) > 100:
-            plane_model, inliers = filtered_pcd.segment_plane(distance_threshold=0.01, ransac_n=3, num_iterations=100)
-            inlier_cloud = filtered_pcd.select_by_index(inliers)
+        # 地面の平面を検出
+        plane_model, inliers = filtered_pcd.segment_plane(distance_threshold=0.01, ransac_n=3, num_iterations=100)
+        inlier_cloud = filtered_pcd.select_by_index(inliers)
 
-            # 法線が特定の閾値を持つ場合に平面として認識
-            a, b, c, d = plane_model
-            normal = np.array([a, b, c])
-            if np.abs(normal[1]) < 0.9:  # 法線が水平すぎない場合
-                inlier_cloud.paint_uniform_color([1.0, 0, 0])
-                plane_segments.append(inlier_cloud)
+        # 法線が特定の閾値を持つ場合に平面として認識
+        a, b, c, d = plane_model
+        normal = np.array([a, b, c])
+        
+        # 地面の傾きを計算
+        if np.abs(normal[1]) < 0.9:  # 法線が水平すぎない場合
+            inlier_cloud.paint_uniform_color([1.0, 0, 0])
 
-            # 残りの点群を更新
-            filtered_pcd = filtered_pcd.select_by_index(inliers, invert=True)
+            # 傾きを計算
+            angle_with_vertical = np.arccos(np.abs(normal[1]))  # y軸との角度
+            angle_degrees = np.degrees(angle_with_vertical)
+            rospy.loginfo(f"Ground plane tilt angle: {angle_degrees:.2f} degrees")
+
+            plane_segments = [inlier_cloud]
+        else:
+            plane_segments = []
 
         # 点群を更新
-        combined_points = np.vstack([np.asarray(plane.points) for plane in plane_segments])
-        combined_colors = np.vstack([np.asarray(plane.colors) for plane in plane_segments])
+        if plane_segments:  # plane_segmentsが空でない場合のみ処理
+            combined_points = np.vstack([np.asarray(plane.points) for plane in plane_segments])
+            combined_colors = np.vstack([np.asarray(plane.colors) for plane in plane_segments])
 
-        pointcloud.points = o3d.utility.Vector3dVector(combined_points)
-        pointcloud.colors = o3d.utility.Vector3dVector(combined_colors)
+            pointcloud.points = o3d.utility.Vector3dVector(combined_points)
+            pointcloud.colors = o3d.utility.Vector3dVector(combined_colors)
 
-        if not geom_added:
-            vis.add_geometry(pointcloud)
-            geom_added = True
-        else:
-            vis.update_geometry(pointcloud)
+            if not geom_added:
+                vis.add_geometry(pointcloud)
+                geom_added = True
+            else:
+                vis.update_geometry(pointcloud)
 
         vis.poll_events()
         vis.update_renderer()
-
+        cv2.imshow('bgr', color_image)
+        key = cv2.waitKey(1)
+        if key == ord('q'):
+            break
         rate.sleep()
 
 finally:
     o3d.io.write_point_cloud("output2.ply", pointcloud)
     cv2.destroyAllWindows()
     vis.destroy_window()
+
+
 
 """
 # 地面一つだけ
