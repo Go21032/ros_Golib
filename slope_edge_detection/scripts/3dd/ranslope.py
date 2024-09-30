@@ -100,8 +100,17 @@ class PointCloudAndSlopeProcessor:
                 else:
                     plane_segments = []
                 
-                self.process_image(self.color_image, self.depth_image, msg_depth=None, angle_degrees=angle_degrees)
-                
+                # セマンティックセグメンテーションと条件に基づく処理
+                pil_img = PilImage.fromarray(cv2.cvtColor(self.color_image, cv2.COLOR_BGR2RGB))
+                results = self.model.predict(source=pil_img)
+
+                if not results or not results[0].masks:
+                    rospy.logwarn("予測結果が存在しません")
+                else:
+                    mask_confidences = results[0].boxes.conf
+                    if results[0].boxes and mask_confidences[0] > 0.8 and angle_degrees > 35:
+                        self.process_segmentation(results[0], self.color_image)
+
                 # 結果の表示
                 if plane_segments:
                     combined_points = np.vstack([np.asarray(plane.points) for plane in plane_segments])
@@ -125,34 +134,22 @@ class PointCloudAndSlopeProcessor:
             cv2.destroyAllWindows()
             self.vis.destroy_window()
 
-
-    def process_image(self, img_color, img_depth, msg_depth, angle_degrees):
-        pil_img = PilImage.fromarray(cv2.cvtColor(img_color, cv2.COLOR_BGR2RGB))
-        results = self.model.predict(source=pil_img)
-
-        if not results or not results[0].masks:
-            rospy.logwarn("予測結果が存在しません")
-            return
-        
-        mask_confidences = results[0].boxes.conf
-        print("信頼度:", mask_confidences)
-        
-        if results[0].boxes and results[0].boxes.conf[0] > 0.8 and angle_degrees > 35:
-            masks = results[0].masks
+        def process_segmentation(self, result, img_color):
+            masks = result.masks
             x_numpy = masks[0].data.to('cpu').detach().numpy().copy()
 
-            name = results[0].names
+            name = result.names
             point = masks[0].xy
             point = np.array(point)
 
-            result = []
+            result_list = []
             for i in range(len(point)):
                 for j in range(len(point[i])):
                     my_list = []
                     for k in range(len(point[i][j])):
                         my_list.append(point[i][j][k])
-                    result.append(my_list)
-            point = np.array(result)
+                    result_list.append(my_list)
+            point = np.array(result_list)
 
             point = sorted(point, key=lambda x: x[1], reverse=True)
             top_points = point[:70]
@@ -160,23 +157,17 @@ class PointCloudAndSlopeProcessor:
             for i in range(len(top_points)):
                 (u, v) = (int(top_points[i][0]), int(top_points[i][1]))
                 cv2.circle(img_color, (u, v), 10, (0, 0, 255), -1)
-            
+
             top_points_y_sorted = sorted(top_points, key=lambda p: p[1], reverse=True)[:70]
 
             median_x_value = np.median([p[0] for p in top_points_y_sorted])
             median_x_candidates = [p for p in top_points_y_sorted if abs(p[0] - median_x_value) < 70]
-
-            (u1, v1) = (int(top_points_y_sorted[0][0]), int(top_points_y_sorted[0][1]))
-            (u2, v2) = (int(top_points_y_sorted[1][0]), int(top_points_y_sorted[1][1]))
 
             median_x = int(np.median([p[0] for p in median_x_candidates]))
             median_y = int(np.median([p[1] for p in top_points_y_sorted]))
 
             cv2.circle(img_color, (median_x, median_y), 10, (255, 0, 0), -1)
 
-            # Assume x, y, z are obtained from some calculation
-            # x, y, z = 0, 0, 0  # Replace with actual calculation
-            # self.csv_writer.writerow([self.frame_id, x, y, z, median_x, median_y])
 
             ts = TransformStamped()
             ts.header = msg_depth.header
