@@ -77,9 +77,6 @@ class PointCloudAndSlopeProcessor:
                 pcd = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd, pinhole_camera_intrinsic)
                 pcd.transform([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
                 
-                # スロープ認識を追加
-                self.process_image(self.color_image, self.depth_image, msg_depth=None)
-                
                 # 平面検出
                 points = np.asarray(pcd.points)
                 pass_x = (points[:, 0] > -1.0) & (points[:, 0] < 1.0)
@@ -91,6 +88,9 @@ class PointCloudAndSlopeProcessor:
                 inlier_cloud = filtered_pcd.select_by_index(inliers)
                 a, b, c, d = plane_model
                 normal = np.array([a, b, c])
+                
+                # スロープ認識を追加
+                angle_degrees = 0
                 if np.abs(normal[1]) < 0.9:
                     inlier_cloud.paint_uniform_color([1.0, 0, 0])
                     angle_with_vertical = np.arccos(np.abs(normal[1]))
@@ -99,6 +99,8 @@ class PointCloudAndSlopeProcessor:
                     plane_segments = [inlier_cloud]
                 else:
                     plane_segments = []
+                
+                self.process_image(self.color_image, self.depth_image, msg_depth=None, angle_degrees=angle_degrees)
                 
                 # 結果の表示
                 if plane_segments:
@@ -123,7 +125,8 @@ class PointCloudAndSlopeProcessor:
             cv2.destroyAllWindows()
             self.vis.destroy_window()
 
-    def process_image(self, img_color, img_depth, msg_depth):
+
+    def process_image(self, img_color, img_depth, msg_depth, angle_degrees):
         pil_img = PilImage.fromarray(cv2.cvtColor(img_color, cv2.COLOR_BGR2RGB))
         results = self.model.predict(source=pil_img)
 
