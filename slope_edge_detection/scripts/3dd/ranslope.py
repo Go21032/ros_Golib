@@ -135,7 +135,7 @@ class PointCloudAndSlopeProcessor:
             rospy.logwarn("マスクが見つかりません")
             return
 
-         name = results[0].names
+        name = results[0].names
         point = masks[0].xy
         point = np.array(point)
 
