@@ -90,15 +90,14 @@ class PointCloudAndSlopeProcessor:
                 results = self.model.predict(source=pil_img)
 
                 if results:
-                    rospy.loginfo("予測結果があります")
                     if results[0].masks:
                         rospy.loginfo("マスクがあります")
                         mask_confidences = results[0].boxes.conf
                         rospy.loginfo(f"信頼度: {mask_confidences[0]}")
                         if results[0].boxes and mask_confidences[0] > 0.8:
                             rospy.loginfo("信頼度が条件を満たしています")
-                            if angle_degrees > 32:
-                                rospy.loginfo("角度が条件を満たしています")
+                            if angle_degrees > 31:
+                                rospy.loginfo(f"角度が条件を満たしています:{angle_degrees:.2f} degrees")
                                 if self.depth_header is not None:
                                     self.process_segmentation(results[0], self.color_image, self.depth_header)
                 else:
@@ -120,6 +119,7 @@ class PointCloudAndSlopeProcessor:
 
                 cv2.imshow('Color Image', self.color_image)
                 key = cv2.waitKey(1)
+                
                 if key == ord('q'):
                     break
                 self.rate.sleep()
@@ -129,26 +129,26 @@ class PointCloudAndSlopeProcessor:
             self.vis.destroy_window()
 
     def process_segmentation(self, result, img_color, depth_header):
+        pil_img = PilImage.fromarray(cv2.cvtColor(self.color_image, cv2.COLOR_BGR2RGB))
+        results = self.model.predict(source=pil_img)
         if not result.masks:
             rospy.logwarn("マスクが見つかりません")
             return
-        
-        masks = result.masks
-        x_numpy = masks[0].data.to('cpu').detach().numpy().copy()
 
-        name = result.names
+         name = results[0].names
         point = masks[0].xy
         point = np.array(point)
 
-        result_list = []
+        result = []
         for i in range(len(point)):
             for j in range(len(point[i])):
                 my_list = []
                 for k in range(len(point[i][j])):
                     my_list.append(point[i][j][k])
-                result_list.append(my_list)
-        point = np.array(result_list)
+                result.append(my_list)
+        point = np.array(result)
 
+        # トップ70ポイントを取得
         point = sorted(point, key=lambda x: x[1], reverse=True)
         top_points = point[:70]
 
@@ -157,7 +157,7 @@ class PointCloudAndSlopeProcessor:
             cv2.circle(img_color, (u, v), 10, (0, 0, 255), -1)
 
         top_points_y_sorted = sorted(top_points, key=lambda p: p[1], reverse=True)[:70]
-      
+
         if len(top_points_y_sorted) == 0:
             rospy.logwarn("トップポイントが見つかりません")
             return
@@ -174,8 +174,13 @@ class PointCloudAndSlopeProcessor:
 
         rospy.loginfo(f"中央値の座標: ({median_x}, {median_y})")
         cv2.circle(img_color, (median_x, median_y), 10, (255, 0, 0), -1)
+
+        # NumPy配列に変換
+        img_color_np = np.asarray(img_color)
         
-        cv2.imshow('Slope Segmentation', img_color)
+        # ウィンドウ名が異なる可能性を考慮して、ウィンドウを再作成
+        cv2.namedWindow('Slope Segmentation', cv2.WINDOW_NORMAL)
+        cv2.imshow('Slope Segmentation', img_color_np)
         cv2.waitKey(1)
 
         ts = TransformStamped()
@@ -185,6 +190,7 @@ class PointCloudAndSlopeProcessor:
         ts.transform.translation.y = 0  # 適切な値を設定
         ts.transform.translation.z = 0  # 適切な値を設定
         self.broadcaster.sendTransform((0, 0, 0), (0, 0, 0, 1), rospy.Time.now(), self.frame_id, depth_header.frame_id)
+
 
 if __name__ == '__main__':
     model_path = "/home/carsim/gakuhari_ws/src/ros_Golib/slope_edge_detection/scripts/best.pt"

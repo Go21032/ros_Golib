@@ -94,23 +94,26 @@ class SlopeDetection:
 
             (u1, v1) = (int(top_points_y_sorted[0][0]), int(top_points_y_sorted[0][1]))
             (u2, v2) = (int(top_points_y_sorted[1][0]), int(top_points_y_sorted[1][1]))
+            if median_x_candidates:
+                median_x = int(np.median([p[0] for p in median_x_candidates]))
+                median_y = int(np.median([p[1] for p in top_points_y_sorted]))
+                cv2.circle(img_color, (median_x, median_y), 10, (255, 0, 0), -1)
 
-            median_x = int(np.median([p[0] for p in median_x_candidates]))
-            median_y = int(np.median([p[1] for p in top_points_y_sorted]))
+                # Assume x, y, z are obtained from some calculation
+                x, y, z = 0, 0, 0  # Replace with actual calculation
+                self.csv_writer.writerow([self.frame_id, x, y, z, median_x, median_y])
 
-            cv2.circle(img_color, (median_x, median_y), 10, (255, 0, 0), -1)
-
-            # Assume x, y, z are obtained from some calculation
-            x, y, z = 0, 0, 0  # Replace with actual calculation
-            self.csv_writer.writerow([self.frame_id, x, y, z, median_x, median_y])
-
-            ts = TransformStamped()
-            ts.header = msg_depth.header
-            ts.child_frame_id = self.frame_id
-            ts.transform.translation.x = x
-            ts.transform.translation.y = y
-            ts.transform.translation.z = z
-            self.broadcaster.sendTransform((x, y, z), (0, 0, 0, 1), rospy.Time.now(), self.frame_id, msg_depth.header.frame_id)
+                cv2.imshow('Slope Segmentation', img_color)
+                cv2.waitKey(1)
+                ts = TransformStamped()
+                ts.header = msg_depth.header
+                ts.child_frame_id = self.frame_id
+                ts.transform.translation.x = x
+                ts.transform.translation.y = y
+                ts.transform.translation.z = z
+                self.broadcaster.sendTransform((x, y, z), (0, 0, 0, 1), rospy.Time.now(), self.frame_id, msg_depth.header.frame_id)
+            else:
+                rospy.logwarn("有効な中央値候補が見つかりませんでした")
 
     def __del__(self):
         self.csv_file.close()

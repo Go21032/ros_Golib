@@ -234,3 +234,68 @@
 #         o3d.io.write_point_cloud("output2.ply", pointcloud)
 #         cv2.destroyAllWindows()
 #         vis.destroy_window()
+
+    def process_segmentation(self, result, img_color, depth_header):
+        if isinstance(self.color_image, np.ndarray):
+            o3d_color_image = cv2.cvtColor(self.color_image, cv2.COLOR_BGR2RGB)
+        else:
+            rospy.logwarn("Color image is not a valid NumPy array")
+
+        if not result.masks:
+            rospy.logwarn("マスクが見つかりません")
+            return
+        
+        masks = result.masks
+        x_numpy = masks[0].data.to('cpu').detach().numpy().copy()
+
+        name = result.names
+        point = masks[0].xy
+        point = np.array(point)
+
+        result_list = []
+        for i in range(len(point)):
+            for j in range(len(point[i])):
+                my_list = []
+                for k in range(len(point[i][j])):
+                    my_list.append(point[i][j][k])
+                result_list.append(my_list)
+        point = np.array(result_list)
+
+        point = sorted(point, key=lambda x: x[1], reverse=True)
+        top_points = point[:70]
+
+        for i in range(len(top_points)):
+            (u, v) = (int(top_points[i][0]), int(top_points[i][1]))
+            cv2.circle(img_color, (u, v), 10, (0, 0, 255), -1)
+
+        top_points_y_sorted = sorted(top_points, key=lambda p: p[1], reverse=True)[:70]
+        
+        if len(top_points_y_sorted) == 0:
+            rospy.logwarn("トップポイントが見つかりません")
+            return
+
+        median_x_value = np.median([p[0] for p in top_points_y_sorted])
+        median_x_candidates = [p for p in top_points_y_sorted if abs(p[0] - median_x_value) < 70]
+
+        if len(median_x_candidates) == 0:
+            rospy.logwarn("中央値候補が見つかりません")
+            return
+
+        median_x = int(np.median([p[0] for p in median_x_candidates]))
+        median_y = int(np.median([p[1] for p in top_points_y_sorted]))
+
+        rospy.loginfo(f"中央値の座標: ({median_x}, {median_y})")
+        cv2.circle(img_color, (median_x, median_y), 10, (255, 0, 0), -1)
+        
+        # img_colorをNumPy配列に変換
+        img_color_np = np.asarray(img_color)
+        cv2.imshow('Slope Segmentation', img_color_np)
+        cv2.waitKey(1)
+
+        ts = TransformStamped()
+        ts.header = depth_header
+        ts.child_frame_id = self.frame_id
+        ts.transform.translation.x = 0  # 適切な値を設定
+        ts.transform.translation.y = 0  # 適切な値を設定
+        ts.transform.translation.z = 0  # 適切な値を設定
+        self.broadcaster.sendTransform((0, 0, 0), (0, 0, 0, 1), rospy.Time.now(), self.frame_id, depth_header.frame_id)
