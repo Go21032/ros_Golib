@@ -7,7 +7,7 @@ import os
 
 model = YOLO("/home/go/slope_ws/src/ros_Golib/slope_edge_detection/scripts/best.pt")
 
-img = Image.open("/home/go/slope_ws/src/ros_Golib/slope_edge_detection/scripts/2dd/kennsyou/slope_39.jpg")
+img = Image.open("/home/go/slope_ws/src/ros_Golib/slope_edge_detection/scripts/2dd/1008_resize/IMG_0714.jpg")
 results = model.predict(source=img, save=True)
 
 masks = results[0].masks
@@ -71,18 +71,18 @@ cv2.imwrite('top_mask10.jpg', img)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
 
-# CSVファイルに座標を出力
-csv_file_path = 'coordinates.csv'
+# # CSVファイルに座標を出力
+# csv_file_path = 'coordinates.csv'
 
-# ファイル書き込みをデバッグするためのメッセージ
-print(f"Attempting to write to {csv_file_path}")
+# # ファイル書き込みをデバッグするためのメッセージ
+# print(f"Attempting to write to {csv_file_path}")
 
-try:
-    with open(csv_file_path, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(['X', 'Y'])  # ヘッダーを書き込む
-        for point in top_points:
-            writer.writerow(point)
-    print(f"Coordinates have been written to {csv_file_path}")
-except Exception as e:
-    print(f"An error occurred while writing to the file: {e}")
+# try:
+#     with open(csv_file_path, mode='w', newline='') as file:
+#         writer = csv.writer(file)
+#         writer.writerow(['X', 'Y'])  # ヘッダーを書き込む
+#         for point in top_points:
+#             writer.writerow(point)
+#     print(f"Coordinates have been written to {csv_file_path}")
+# except Exception as e:
+#     print(f"An error occurred while writing to the file: {e}")
