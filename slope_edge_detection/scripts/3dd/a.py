@@ -36,17 +36,12 @@ class SlopeDetection:
         file_name = f'slope_3次元座標{current_time}.csv'
         self.csv_file = open(file_name, 'w', newline='')
         self.csv_writer = csv.writer(self.csv_file)
-        self.csv_writer.writerow(['name', 'X', 'Y', 'Z', 'distance', 'grand_dis'])
+        self.csv_writer.writerow(['name', 'X', 'Y', 'Z', 'median_x', 'median_y'])
 
     def images_callback(self, msg_info, msg_color, msg_depth):
         try:
             img_color = self.bridge.imgmsg_to_cv2(msg_color, 'bgr8')
             img_depth = self.bridge.imgmsg_to_cv2(msg_depth, 'passthrough').copy()
-            
-            # 地面の中央のピクセルの距離を取得
-            height, width = img_depth.shape
-            center_distance = img_depth[height // 2, width // 2] /1000
-            print(f"中央の距離: {center_distance:.2f} メートル")
             
         except CvBridgeError as e:
             rospy.logwarn(str(e))
@@ -72,7 +67,7 @@ class SlopeDetection:
         print("信頼度:", mask_confidences)
         
         # 信頼度が90%以上か確認
-        if results[0].boxes and results[0].boxes.conf[0] > 0.8 and center_distance < 4.5:
+        if results[0].boxes and results[0].boxes.conf[0] > 0.8
             masks = results[0].masks
             x_numpy = masks[0].data.to('cpu').detach().numpy().copy()
 
@@ -157,40 +152,21 @@ class SlopeDetection:
                  
                         
             #映像出力rosbag playでやるときのみ外す
-            cv2.imshow('color', img_color)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                rospy.signal_shutdown('closed')
-                return
+            # cv2.imshow('color', img_color)
+            # if cv2.waitKey(1) & 0xFF == ord('q'):
+            #     rospy.signal_shutdown('closed')
+            #     return
+            # Write to CSV
+            self.csv_writer.writerow([self.frame_id, x, y, z, median_x, median_y])
 
-            # Get depth at median point
-            depth = img_depth[median_y, median_x]
-
-            if depth != 0:
-                z = depth * 1e-3
-                fx = msg_info.K[0]
-                fy = msg_info.K[4]
-                cx = msg_info.K[2]
-                cy = msg_info.K[5]
-                x = z / fx * (median_x - cx)
-                y = z / fy * (median_y - cy)
-
-                # 距離に変換
-                dis_x = x ** 2
-                dis_y = y ** 2
-                dis_z = z ** 2
-                dis = np.sqrt(dis_x + dis_y + dis_z)
-                rospy.loginfo(f'{self.frame_id} ({dis:.3f})')
-                # Write to CSV
-                self.csv_writer.writerow([self.frame_id, x, y, z, f'{dis:.3f}', f'{center_distance:.3f}'])
-
-                # Broadcast transform
-                ts = TransformStamped()
-                ts.header = msg_depth.header
-                ts.child_frame_id = self.frame_id
-                ts.transform.translation.x = x
-                ts.transform.translation.y = y
-                ts.transform.translation.z = z
-                self.broadcaster.sendTransform((x, y, z), (0, 0, 0, 1), rospy.Time.now(), self.frame_id, msg_depth.header.frame_id)
+            # Broadcast transform
+            ts = TransformStamped()
+            ts.header = msg_depth.header
+            ts.child_frame_id = self.frame_id
+            ts.transform.translation.x = x
+            ts.transform.translation.y = y
+            ts.transform.translation.z = z
+            self.broadcaster.sendTransform((x, y, z), (0, 0, 0, 1), rospy.Time.now(), self.frame_id, msg_depth.header.frame_id)
 
     def __del__(self):
         self.csv_file.close()
