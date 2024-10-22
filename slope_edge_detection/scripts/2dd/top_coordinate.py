@@ -5,9 +5,9 @@ import numpy as np
 import csv
 import os
 
-model = YOLO("/home/go/slope_ws/src/ros_Golib/slope_edge_detection/scripts/best.pt")
+model = YOLO("/home/carsim05/slope_ws/src/ros_Golib/slope_edge_detection/scripts/best.pt")
 
-img = Image.open("/home/go/slope_ws/src/ros_Golib/slope_edge_detection/scripts/2dd/1008_resize/IMG_0714.jpg")
+img = Image.open("/home/carsim05/slope_ws/src/ros_Golib/slope_edge_detection/scripts/2dd/1008_resize/IMG_0708.jpg")
 results = model.predict(source=img, save=True)
 
 masks = results[0].masks

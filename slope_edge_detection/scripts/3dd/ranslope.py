@@ -193,6 +193,6 @@ class PointCloudAndSlopeProcessor:
 
 
 if __name__ == '__main__':
-    model_path = "/home/carsim/gakuhari_ws/src/ros_Golib/slope_edge_detection/scripts/best.pt"
+    model_path = "/home/carsim05/slope_ws/src/ros_Golib/slope_edge_detection/scripts/best.pt"
     processor = PointCloudAndSlopeProcessor(model_path)
     processor.process_pointcloud()

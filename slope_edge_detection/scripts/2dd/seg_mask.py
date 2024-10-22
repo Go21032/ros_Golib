@@ -13,7 +13,7 @@ import rospy
 #これはボツコード
 class maskDetectionv8:
     def __init__(self):
-        self.model = YOLO("/home/go/slope_ws/src/ros_Golib/slope_edge_detection/scripts/best.pt")
+        self.model = YOLO("/home/carsim05/slope_ws/src/ros_Golib/slope_edge_detection/scripts/best.pt")
 
         self.bridge = CvBridge()
         
@@ -108,7 +108,7 @@ class maskDetectionv8:
             print(f"3D coordinates: ({x}, {y}, {z})")
 
         # 画像を表示＆保存
-        cv2.imwrite('seg_mask2.jpg', img)
+        cv2.imwrite('seg_mask11.jpg', img)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
