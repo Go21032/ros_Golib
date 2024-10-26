@@ -148,7 +148,7 @@ class SlopeDetection:
                         plane_segments = []
                     
                     pil_img = PilImage.fromarray(cv2.cvtColor(self.color_image, cv2.COLOR_BGR2RGB))
-                    results = self.model.predict(source=pil_img, device='cuda' if torch.cuda.is_available() else 'cpu')  # GPUを指定して予測
+                    results = self.model.predict(source=pil_img, device=self.device, verbose=False)  # GPUを指定して予測
 
                     if results:
                         if results[0].masks:
@@ -241,9 +241,9 @@ class SlopeDetection:
         cv2.circle(color_image, (median_x, median_y), 10, (255, 0, 0), -1)
 
         # ウィンドウ名が異なる可能性を考慮して、ウィンドウを再作成
-        # cv2.namedWindow('Slope Segmentation', cv2.WINDOW_NORMAL)
-        # cv2.imshow('Slope Segmentation', color_image)
-        # cv2.waitKey(1)
+        cv2.namedWindow('Slope Segmentation', cv2.WINDOW_NORMAL)
+        cv2.imshow('Slope Segmentation', color_image)
+        cv2.waitKey(1)
 
         ts = TransformStamped()
         ts.header = msg_depth.header
