@@ -59,14 +59,13 @@ class SlopeDetection:
         else:
             rospy.logwarn("予測結果またはマスクが見つかりません")
 
-
     def process_pointcloud(self):
-        last_ransac_time = rospy.Time.now()  # RANSAC用のタイマー追加
+        last_ransac_time = rospy.Time.now()  # 初期化
         try:
             while not rospy.is_shutdown():
                 if self.color_image is None or self.depth_image is None or self.intrinsics is None:
-                    rospy.loginfo("Waiting for images and camera info...")
-                    #rospy.sleep(0.1)
+                    #rospy.loginfo("Waiting for images and camera info...")
+                    rospy.sleep(0.1)
                     continue
 
                 # RANSACを3秒ごとに実行
@@ -105,50 +104,50 @@ class SlopeDetection:
                         inlier_cloud.paint_uniform_color([1.0, 0, 0])
                         angle_with_vertical = np.arccos(np.abs(normal[1]))
                         angle_degrees = np.degrees(angle_with_vertical)
-                        rospy.loginfo(f"Ground plane tilt angle: {angle_degrees:.2f} degrees")
+                        #rospy.loginfo(f"Ground plane tilt angle: {angle_degrees:.2f} degrees")
                         plane_segments = [inlier_cloud]
                     else:
                         plane_segments = []
                     
                     pil_img = PilImage.fromarray(cv2.cvtColor(self.color_image, cv2.COLOR_BGR2RGB))
                     results = self.model.predict(source=pil_img)
-                    
-                if results:
-                    if results[0].masks:
-                        rospy.loginfo("マスクがあります")
-                        mask_confidences = results[0].boxes.conf
-                        rospy.loginfo(f"信頼度: {mask_confidences[0]}")
-                        if results[0].boxes and mask_confidences[0] > 0.8:
-                            rospy.loginfo("信頼度が条件を満たしています")
-                            if angle_degrees > 31:
-                                rospy.loginfo(f"角度が条件を満たしています:{angle_degrees:.2f} degrees")
-                                if self.depth_image is not None:
-                                    self.process_segmentation(results[0], self.color_image, self.depth_image)
-                else:
-                    rospy.logwarn("予測結果が存在しません")
 
-
-                if plane_segments:
-                    combined_points = np.vstack([np.asarray(plane.points) for plane in plane_segments])
-                    combined_colors = np.vstack([np.asarray(plane.colors) for plane in plane_segments])
-                    self.pointcloud.points = o3d.utility.Vector3dVector(combined_points)
-                    self.pointcloud.colors = o3d.utility.Vector3dVector(combined_colors)
-                    if not self.geom_added:
-                        self.vis.add_geometry(self.pointcloud)
-                        self.geom_added = True
+                    if results:
+                        if results[0].masks:
+                            #rospy.loginfo("マスクがあります")
+                            mask_confidences = results[0].boxes.conf
+                            #rospy.loginfo(f"信頼度: {mask_confidences[0]}")
+                            if results[0].boxes and mask_confidences[0] > 0.8:
+                                #rospy.loginfo("信頼度が条件を満たしています")
+                                if angle_degrees > 31:
+                                    #rospy.loginfo(f"角度が条件を満たしています:{angle_degrees:.2f} degrees")
+                                    if self.depth_image is not None:
+                                        self.process_segmentation(results[0], self.color_image, self.depth_image)
                     else:
-                        self.vis.update_geometry(self.pointcloud)
-                self.vis.poll_events()
-                self.vis.update_renderer()
+                        rospy.logwarn("予測結果が存在しません")
 
-                cv2.imshow('Color Image', self.color_image)
-                key = cv2.waitKey(1)
-                
-                if key == ord('q'):
-                    break
-                last_ransac_time = current_time  # 最後の実行時間を更新
+                    if plane_segments:
+                        combined_points = np.vstack([np.asarray(plane.points) for plane in plane_segments])
+                        combined_colors = np.vstack([np.asarray(plane.colors) for plane in plane_segments])
+                        self.pointcloud.points = o3d.utility.Vector3dVector(combined_points)
+                        self.pointcloud.colors = o3d.utility.Vector3dVector(combined_colors)
+                        if not self.geom_added:
+                            self.vis.add_geometry(self.pointcloud)
+                            self.geom_added = True
+                        else:
+                            self.vis.update_geometry(self.pointcloud)
+                    self.vis.poll_events()
+                    self.vis.update_renderer()
+
+                    cv2.imshow('Color Image', self.color_image)
+                    key = cv2.waitKey(1)
+                    
+                    if key == ord('q'):
+                        break
+                    
+                    last_ransac_time = current_time  # 最後の実行時間を更新
+
                 self.rate.sleep()
-                
         finally:
             o3d.io.write_point_cloud("output2.ply", self.pointcloud)
             cv2.destroyAllWindows()
@@ -187,7 +186,6 @@ class SlopeDetection:
         if len(top_points_y_sorted) == 0:
             rospy.logwarn("トップポイントが見つかりません")
             return
-
         median_x_value = np.median([p[0] for p in top_points_y_sorted])
         median_x_candidates = [p for p in top_points_y_sorted if abs(p[0] - median_x_value) < 70]
 
@@ -198,7 +196,7 @@ class SlopeDetection:
         median_x = int(np.median([p[0] for p in median_x_candidates]))
         median_y = int(np.median([p[1] for p in top_points_y_sorted]))
 
-        rospy.loginfo(f"中央値の座標: ({median_x}, {median_y})")
+        #rospy.loginfo(f"中央値の座標: ({median_x}, {median_y})")
         cv2.circle(color_image, (median_x, median_y), 10, (255, 0, 0), -1)
 
         # ウィンドウ名が異なる可能性を考慮して、ウィンドウを再作成
@@ -221,3 +219,4 @@ if __name__ == '__main__':
     node = SlopeDetection(model_path)
     node.process_pointcloud() 
     rospy.spin()
+
