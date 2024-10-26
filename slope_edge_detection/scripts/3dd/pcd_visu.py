@@ -2,7 +2,7 @@ import open3d as o3d
 
 def visualize_ply(file_path):
     # PLYファイルを読み込む
-    file_path = "/home/carsim05/slope_ws/src/ros_Golib/slope_edge_detection/scripts/3dd/output2.ply"
+    file_path = "/home/carsim05/slope_ws/src/ros_Golib/slope_edge_detection/scripts/3dd/ransac3seco.ply"
     pcd = o3d.io.read_point_cloud(file_path)
 
     # ビジュアライザを作成
