@@ -12,6 +12,7 @@ from message_filters import Subscriber, ApproximateTimeSynchronizer
 from tf import TransformBroadcaster
 from ultralytics import YOLO
 from PIL import Image as PilImage
+import GPUtil  # GPUの使用率を取得するためのライブラリをインポート
 
 class SlopeDetection:
 
@@ -31,12 +32,12 @@ class SlopeDetection:
         
         # 画像とカメラ情報のトピックを同期させる
         self.ts = ApproximateTimeSynchronizer([self.sub_info, self.sub_color, self.sub_depth], 20, 0.1)
-        self.ts.registerCallback(self.images_callback)
+        self.ts.registerCallback(self.callback)
         
         # Transform broadcaster
         self.broadcaster = TransformBroadcaster()
         
-    def images_callback(self, msg_info, msg_color, msg_depth):
+    def callback(self, msg_info, msg_color, msg_depth):
         try:
             img_color = self.bridge.imgmsg_to_cv2(msg_color, 'bgr8')
             img_depth = self.bridge.imgmsg_to_cv2(msg_depth, 'passthrough').copy()
@@ -56,9 +57,15 @@ class SlopeDetection:
         results = self.model.predict(source=pil_img, device=self.device, verbose=False)  # GPUを指定して予測
 
         if results and results[0].masks:
-            self.process_segmentation(results[0], img_color, img_depth, msg_info, img_depth[img_color.shape[0] // 2, img_color.shape[1] // 2] / 1000)
+            self.process_segmentation(results[0], img_color, img_depth, msg_info)
 
-    def process_segmentation(self, results, img_color, img_depth, msg_info, center_distance):
+    def get_gpu_usage(self):
+        gpus = GPUtil.getGPUs()
+        if gpus:
+            return gpus[0].load * 100  # 使用率をパーセントで返す
+        return 0
+    
+    def process_segmentation(self, results, img_color, img_depth, msg_info):
         # 予測結果がない場合の処理
         if not results or not results.masks:
             rospy.logwarn("予測結果が存在しません")
@@ -68,8 +75,12 @@ class SlopeDetection:
         mask_confidences = results.boxes.conf
         print("信頼度:", mask_confidences)
         
-        # 信頼度が90%以上か確認
-        if results.boxes and results.boxes.conf[0] > 0.8 and center_distance < 4.5:
+        # GPU使用率を表示
+        gpu_usage = self.get_gpu_usage()
+        rospy.loginfo(f"GPU Usage: {gpu_usage:.2f}%")
+
+        # 信頼度が80%以上か確認
+        if results.boxes and results.boxes.conf[0] > 0.8:
             masks = results.masks.to(self.device)  # マスクをGPUに送る
             x_numpy = masks[0].data.to('cpu').detach().numpy().copy()
 
@@ -90,7 +101,7 @@ class SlopeDetection:
             # y座標が高い順にソート
             point = sorted(point, key=lambda x: x[1], reverse=True)
 
-            # 上位50個のy座標が高い座標を取得
+            # 上位70個のy座標が高い座標を取得
             top_points = point[:70]
 
             # 座標の表示
@@ -99,21 +110,24 @@ class SlopeDetection:
                 # 画像内に指定したクラス(results[0]の境界線を赤点で描画
                 cv2.circle(img_color, (u, v), 10, (0, 0, 255), -1)
             
-            # y座標のピクセル値が高い順に上位50個を選ぶ
+            # y座標のピクセル値が高い順に上位70個を選ぶ
             top_points_y_sorted = sorted(top_points, key=lambda p: p[1], reverse=True)[:70]
 
-            # x座標の中央値を計算するために、上位50個のうちx座標を絞る
+            # x座標の中央値を計算するために、上位70個のうちx座標を絞る
             median_x_value = np.median([p[0] for p in top_points_y_sorted])
-            median_x_candidates = [p for p in top_points_y_sorted if abs(p[0] - median_x_value) < 70]  # 50は調整可能
+            median_x_candidates = [p for p in top_points_y_sorted if abs(p[0] - median_x_value) < 70]  # 70は調整可能
 
-            # x座標とy座標の中央値をそれぞれ算出
-            median_x = int(np.median([p[0] for p in median_x_candidates]))
-            median_y = int(np.median([p[1] for p in top_points_y_sorted]))
+            # median_x_candidatesが空でないかを確認
+            if median_x_candidates:
+                median_x = int(np.median([p[0] for p in median_x_candidates]))
+                median_y = int(np.median([p[1] for p in top_points_y_sorted]))
 
-            # 中央の点を描画
-            cv2.circle(img_color, (median_x, median_y), 10, (255, 0, 0), -1)
-                        
-            #映像出力rosbag playでやるときのみ外す
+                # 中央の点を描画
+                cv2.circle(img_color, (median_x, median_y), 10, (255, 0, 0), -1)
+            else:
+                rospy.logwarn("中央値を計算するための候補がありません")
+            
+            # 映像出力rosbag playでやるときのみ外す
             cv2.imshow('color', img_color)
             cv2.waitKey(1)  # ウィンドウを更新するためのキー入力を待つ
 
@@ -122,4 +136,3 @@ if __name__ == '__main__':
     model_path = "/home/carsim05/slope_ws/src/ros_Golib/slope_edge_detection/scripts/best.pt"
     node = SlopeDetection(model_path)
     rospy.spin()
-

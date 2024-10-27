@@ -1,22 +1,32 @@
+#!/usr/bin/env python3
+import sys
+import cv2
+import numpy as np
 import rospy
+import torch
 from sensor_msgs.msg import Image, CameraInfo
 from cv_bridge import CvBridge
-import numpy as np
 import open3d as o3d
-import cv2
 import GPUtil
-import torch
+from ultralytics import YOLO
 
-class PointCloudProcessor:
-    def __init__(self):
+class SR:
+    def __init__(self, model_path):
+        rospy.init_node('SR_node')  # ノードの初期化をここに移動
         self.color_image = None
         self.depth_image = None
         self.intrinsics = None
         self.bridge = CvBridge()
-        rospy.init_node('pointcloud_node')
+        
         rospy.Subscriber('/camera/color/image_raw', Image, self.callback, callback_args='color')
         rospy.Subscriber('/camera/aligned_depth_to_color/image_raw', Image, self.callback, callback_args='depth')
         rospy.Subscriber('/camera/aligned_depth_to_color/camera_info', CameraInfo, self.callback, callback_args='info')
+        
+        # YOLOモデルの初期化
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.model = YOLO(model_path)
+        self.model.model.to(self.device)
+
         self.vis = o3d.visualization.Visualizer()
         self.vis.create_window('PCD', width=640, height=480)
         self.pointcloud = o3d.geometry.PointCloud()
@@ -30,11 +40,11 @@ class PointCloudProcessor:
             self.depth_image = self.bridge.imgmsg_to_cv2(msg, "16UC1")
         elif msg_type == 'info':
             self.intrinsics = msg
-    
+
     def get_gpu_usage(self):
         gpus = GPUtil.getGPUs()
         if gpus:
-            return gpus[0].load * 100  # 使用率をパーセントで返す
+            return gpus[0].load * 100
         return 0
 
     def process_pointcloud(self):
@@ -78,6 +88,9 @@ class PointCloudProcessor:
                 inlier_cloud = filtered_pcd.select_by_index(inliers)
                 a, b, c, d = plane_model
                 normal = np.array([a, b, c])
+
+                angle_degrees = 0
+                
                 if np.abs(normal[1]) < 0.9:
                     inlier_cloud.paint_uniform_color([1.0, 0, 0])
                     angle_with_vertical = np.arccos(np.abs(normal[1]))
@@ -86,6 +99,25 @@ class PointCloudProcessor:
                     plane_segments = [inlier_cloud]
                 else:
                     plane_segments = []
+
+                # YOLOでスロープを検出
+                pil_img = cv2.cvtColor(self.color_image, cv2.COLOR_BGR2RGB)
+                results = self.model.predict(source=pil_img, device=self.device, verbose=False)
+
+                if results:
+                    if results[0].masks:
+                        rospy.loginfo("マスクがあります")
+                        mask_confidences = results[0].boxes.conf
+                        rospy.loginfo(f"信頼度: {mask_confidences[0]}")
+                        if results[0].boxes and mask_confidences[0] > 0.8:
+                            rospy.loginfo("信頼度が条件を満たしています")
+                            if angle_degrees > 31:
+                                rospy.loginfo(f"角度が条件を満たしています:{angle_degrees:.2f} degrees")
+                                if self.depth_image is not None:
+                                    self.process_segmentation(results[0], self.color_image, self.depth_image)
+                else:
+                    rospy.logwarn("予測結果が存在しません")
+
 
                 if plane_segments:
                     combined_points = np.vstack([np.asarray(plane.points) for plane in plane_segments])
@@ -115,6 +147,70 @@ class PointCloudProcessor:
             cv2.destroyAllWindows()
             self.vis.destroy_window()
 
+    def process_segmentation(self, results, img_color, img_depth):
+        if not results or not results.masks:
+            rospy.logwarn("予測結果が存在しません")
+            return
+        
+        # 信頼度の取得と表示
+        mask_confidences = results.boxes.conf
+        print("信頼度:", mask_confidences)
+        
+        # GPU使用率を表示
+        gpu_usage = self.get_gpu_usage()
+        rospy.loginfo(f"GPU Usage: {gpu_usage:.2f}%")
+
+        masks = results.masks.to(self.device)  # マスクをGPUに送る
+        x_numpy = masks[0].data.to('cpu').detach().numpy().copy()
+
+        name = results.names
+        point = masks[0].xy
+        point = np.array(point)
+
+        # ３次元を２次元に変換する
+        result = []
+        for i in range(len(point)):
+            for j in range(len(point[i])):
+                my_list = []
+                for k in range(len(point[i][j])):
+                    my_list.append(point[i][j][k])
+                result.append(my_list)
+        point = np.array(result)
+
+        # y座標が高い順にソート
+        point = sorted(point, key=lambda x: x[1], reverse=True)
+
+        # 上位70個のy座標が高い座標を取得
+        top_points = point[:70]
+
+        # 座標の表示
+        for i in range(len(top_points)):
+            (u, v) = (int(top_points[i][0]), int(top_points[i][1]))
+            # 画像内に指定したクラス(results[0]の境界線を赤点で描画
+            cv2.circle(img_color, (u, v), 10, (0, 0, 255), -1)
+        
+        # y座標のピクセル値が高い順に上位70個を選ぶ
+        top_points_y_sorted = sorted(top_points, key=lambda p: p[1], reverse=True)[:70]
+
+        # x座標の中央値を計算するために、上位70個のうちx座標を絞る
+        median_x_value = np.median([p[0] for p in top_points_y_sorted])
+        median_x_candidates = [p for p in top_points_y_sorted if abs(p[0] - median_x_value) < 70]  # 70は調整可能
+
+        # median_x_candidatesが空でないかを確認
+        if median_x_candidates:
+            median_x = int(np.median([p[0] for p in median_x_candidates]))
+            median_y = int(np.median([p[1] for p in top_points_y_sorted]))
+
+            # 中央の点を描画
+            cv2.circle(img_color, (median_x, median_y), 10, (255, 0, 0), -1)
+        else:
+            rospy.logwarn("中央値を計算するための候補がありません")
+        
+        # 映像出力rosbag playでやるときのみ外す
+        cv2.imshow('color', img_color)
+        cv2.waitKey(1)  # ウィンドウを更新するためのキー入力を待つ
+        
 if __name__ == '__main__':
-    processor = PointCloudProcessor()
-    processor.process_pointcloud()
+    model_path = "/home/carsim05/slope_ws/src/ros_Golib/slope_edge_detection/scripts/best.pt"
+    node = SR(model_path)
+    node.process_pointcloud()  # メインループを開始
