@@ -121,40 +121,6 @@ class SlopeDetection:
 
             # 中央の点を描画
             cv2.circle(img_color, (median_x, median_y), 10, (255, 0, 0), -1)
-            
-            """
-            #左により杉
-            # y座標のピクセル値が高い順に上位50個を選ぶ
-            top_points_y_sorted = sorted(top_points, key=lambda p: p[1], reverse=True)[:100]
-
-            # x座標の中央値を計算するために、上位50個のうちx座標の範囲を絞る
-            median_x_candidates = [p for p in top_points if p[0] < np.median([p[0] for p in top_points])]
-
-            # y座標が高い2つの点を選ぶ
-            (u1, v1) = (int(top_points_y_sorted[0][0]), int(top_points_y_sorted[0][1]))
-            (u2, v2) = (int(top_points_y_sorted[1][0]), int(top_points_y_sorted[1][1]))
-
-            # x座標とy座標の中央値をそれぞれ算出
-            median_x = int(np.median([p[0] for p in median_x_candidates]))
-            median_y = int(np.median([p[1] for p in top_points_y_sorted]))
-
-            # 中央の点を描画
-            cv2.circle(img_color, (median_x, median_y), 10, (255, 0, 0), -1)  
-            """  
-            
-            """
-            #元のやつ
-            # 上位50個の座標の中から最もy座標が高い2つの点を選びu1u2などをそれに当てる
-            top_points_sorted = sorted(top_points, key=lambda p: p[1], reverse=True)
-            (u1, v1) = (int(top_points[0][0]), int(top_points[0][1]))
-            (u2, v2) = (int(top_points[1][0]), int(top_points[1][1]))
-
-            # 上位50個の座標の中央値を算出
-            median_x = int(np.median([p[0] for p in top_points_sorted]))
-            median_y = int(np.median([p[1] for p in top_points_sorted]))
-            cv2.circle(img_color, (median_x, median_y), 10, (255, 0, 0), -1)
-            """
-                 
                         
             #映像出力rosbag playでやるときのみ外す
             cv2.imshow('color', img_color)

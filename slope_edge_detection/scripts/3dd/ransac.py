@@ -4,6 +4,7 @@ from cv_bridge import CvBridge
 import numpy as np
 import open3d as o3d
 import cv2
+import GPUtil  # GPUの使用状況を取得するためのライブラリ
 
 class PointCloudProcessor:
     def __init__(self):
@@ -27,6 +28,13 @@ class PointCloudProcessor:
             self.depth_image = self.bridge.imgmsg_to_cv2(msg, "16UC1")
         elif msg_type == 'info':
             self.intrinsics = msg
+    
+    def get_gpu_usage(self):
+        gpus = GPUtil.getGPUs()
+        if gpus:
+            return gpus[0].load * 100  # 使用率をパーセントで返す
+        return 0
+
     def process_pointcloud(self):
         try:
             while not rospy.is_shutdown():
@@ -75,6 +83,12 @@ class PointCloudProcessor:
                         self.vis.update_geometry(self.pointcloud)
                 self.vis.poll_events()
                 self.vis.update_renderer()
+
+
+                # GPU使用率を表示
+                gpu_usage = self.get_gpu_usage()
+                rospy.loginfo(f"GPU Usage: {gpu_usage:.2f}%")
+
                 cv2.imshow('bgr', self.color_image)
                 key = cv2.waitKey(1)
                 if key == ord('q'):

@@ -57,12 +57,9 @@ class SlopeDetection:
     def callback(self, msg_info, msg_color, msg_depth):
         try:
             self.color_image = self.bridge.imgmsg_to_cv2(msg_color, 'bgr8')
-            # self.depth_image = self.bridge.imgmsg_to_cv2(msg_depth, 'passthrough').copy()
-            self.depth_image = self.bridge.imgmsg_to_cv2(msg_depth, '16UC1')
+            self.depth_image = self.bridge.imgmsg_to_cv2(msg_depth, '16UC1').copy()
             self.intrinsics = msg_info # CameraInfoを保存
             rospy.loginfo(f"Intrinsics: {self.intrinsics.K}")  # 内部パラメータをログに出力
-            # 深度画像の値を確認
-            rospy.loginfo(f"Depth image min: {np.min(self.depth_image)}, max: {np.max(self.depth_image)}")
         except CvBridgeError as e:
             rospy.logwarn(str(e))
             return
@@ -89,17 +86,13 @@ class SlopeDetection:
                     rospy.sleep(0.1)
                     continue  # ここはループ内なので問題なし
 
-                # 深度画像のデータ型を確認
-                rospy.loginfo(f"Depth image dtype: {self.depth_image.dtype}, shape: {self.depth_image.shape}")
+                rospy.loginfo("Processing point cloud...")  
 
-                # 深度画像のスケーリング
-                self.depth_image = self.depth_image.astype(np.float32)   # mm to meters
+                # 深度画像のデータ型を確認し、必要に応じて変換
+                if self.depth_image.dtype != np.uint16:
+                    rospy.logwarn("Converting depth image to uint16")
+                    self.depth_image = self.depth_image.astype(np.uint16)
 
-                # 深度画像が全てゼロでないか確認
-                if np.all(self.depth_image == 0):
-                    rospy.logwarn("Depth image contains only zeros.")
-                    continue
-                
                 # 毎秒RANSACを実行
                 o3d_color_image = cv2.cvtColor(self.color_image, cv2.COLOR_BGR2RGB)
                 img_depth = o3d.geometry.Image(self.depth_image)
@@ -119,18 +112,17 @@ class SlopeDetection:
                     continue
 
                 points = np.asarray(pcd.points)
-                pass_x = (points[:, 0] > -5.0) & (points[:, 0] < 5.0)  # 条件を緩める
-                pass_y = (points[:, 1] > -5.0) & (points[:, 1] < 5.0)
+                pass_x = (points[:, 0] > -2.0) & (points[:, 0] < 2.0)  # 条件を緩める
+                pass_y = (points[:, 1] > -2.0) & (points[:, 1] < 2.0)
                 filtered_indices = np.where(pass_x & pass_y)[0]
                 filtered_pcd = pcd.select_by_index(filtered_indices)
                 filtered_pcd = filtered_pcd.voxel_down_sample(voxel_size=0.005)
 
                 rospy.loginfo(f"Filtered PointCloud Points: {len(filtered_pcd.points)}")
-                if len(filtered_pcd.points) < 3:  # RANSACに必要な点数を確認
-                    rospy.logwarn("フィルタリング後のPointCloudが少なすぎます。")
+                if len(filtered_pcd.points) == 0:
+                    rospy.logwarn("フィルタリング後のPointCloudが空です。")
                     continue
 
-                # RANSACを実行
                 plane_model, inliers = filtered_pcd.segment_plane(distance_threshold=0.01, ransac_n=3, num_iterations=100)
                 inlier_cloud = filtered_pcd.select_by_index(inliers)
 
