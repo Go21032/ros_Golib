@@ -14,9 +14,12 @@ class PointCloudProcessor:
         self.intrinsics = None
         self.bridge = CvBridge()
         rospy.init_node('pointcloud_node')
+        
+        # 高解像度に設定したカメラトピックを購読
         rospy.Subscriber('/camera/color/image_raw', Image, self.callback, callback_args='color')
         rospy.Subscriber('/camera/aligned_depth_to_color/image_raw', Image, self.callback, callback_args='depth')
         rospy.Subscriber('/camera/aligned_depth_to_color/camera_info', CameraInfo, self.callback, callback_args='info')
+        
         self.vis = o3d.visualization.Visualizer()
         self.vis.create_window('PCD', width=640, height=480)
         self.pointcloud = o3d.geometry.PointCloud()
@@ -50,8 +53,8 @@ class PointCloudProcessor:
                 img_color = o3d.geometry.Image(o3d_color_image)
 
                 # PyTorchを使用して深度画像をGPUで処理
-                depth_tensor = torch.tensor(self.depth_image, dtype=torch.float32, device='cuda')  # GPUに転送し、Float32に変換
-                filtered_depth = depth_tensor[depth_tensor < 1000]  # 例: 深度フィルタリング
+                depth_tensor = torch.tensor(self.depth_image, dtype=torch.float32, device='cuda')
+                filtered_depth = depth_tensor[depth_tensor < 1000]
 
                 # Open3Dでポイントクラウドを生成
                 rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
@@ -64,17 +67,16 @@ class PointCloudProcessor:
 
                 pcd = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd, pinhole_camera_intrinsic)
 
-                # 以下の処理は前と同様
                 pcd.transform([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
                 points = np.asarray(pcd.points)
                 pass_x = (points[:, 0] > -1.0) & (points[:, 0] < 1.0)
                 pass_y = (points[:, 1] > -1.0) & (points[:, 1] < 1.0)
                 filtered_indices = np.where(pass_x & pass_y)[0]
                 filtered_pcd = pcd.select_by_index(filtered_indices)
-                filtered_pcd = filtered_pcd.voxel_down_sample(voxel_size=0.005)
+                filtered_pcd = filtered_pcd.voxel_down_sample(voxel_size=0.0015)
 
                 # 平面セグメンテーション
-                plane_model, inliers = filtered_pcd.segment_plane(distance_threshold=0.01, ransac_n=3, num_iterations=100)
+                plane_model, inliers = filtered_pcd.segment_plane(distance_threshold=0.01, ransac_n=3, num_iterations=1000)
                 inlier_cloud = filtered_pcd.select_by_index(inliers)
                 a, b, c, d = plane_model
                 normal = np.array([a, b, c])
