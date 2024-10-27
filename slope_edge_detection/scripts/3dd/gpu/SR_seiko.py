@@ -81,10 +81,10 @@ class SR:
                 pass_y = (points[:, 1] > -1.0) & (points[:, 1] < 1.0)
                 filtered_indices = np.where(pass_x & pass_y)[0]
                 filtered_pcd = pcd.select_by_index(filtered_indices)
-                filtered_pcd = filtered_pcd.voxel_down_sample(voxel_size=0.005)
+                filtered_pcd = filtered_pcd.voxel_down_sample(voxel_size=0.0015)
 
                 # 平面セグメンテーション
-                plane_model, inliers = filtered_pcd.segment_plane(distance_threshold=0.01, ransac_n=3, num_iterations=100)
+                plane_model, inliers = filtered_pcd.segment_plane(distance_threshold=0.01, ransac_n=3, num_iterations=1000)
                 inlier_cloud = filtered_pcd.select_by_index(inliers)
                 a, b, c, d = plane_model
                 normal = np.array([a, b, c])
