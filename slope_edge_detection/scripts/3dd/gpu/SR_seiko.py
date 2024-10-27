@@ -114,7 +114,7 @@ class SR:
                             if angle_degrees > 31:
                                 rospy.loginfo(f"角度が条件を満たしています:{angle_degrees:.2f} degrees")
                                 if self.depth_image is not None:
-                                    self.process_segmentation(results[0], self.color_image, self.depth_image)
+                                    self.process_segmentation(results[0], self.color_image, self.depth_image, inliers)
                 else:
                     rospy.logwarn("予測結果が存在しません")
 
@@ -147,7 +147,7 @@ class SR:
             cv2.destroyAllWindows()
             self.vis.destroy_window()
 
-    def process_segmentation(self, results, img_color, img_depth):
+    def process_segmentation(self, results, img_color, img_depth, inliers):
         if not results or not results.masks:
             rospy.logwarn("予測結果が存在しません")
             return
@@ -160,37 +160,32 @@ class SR:
         gpu_usage = self.get_gpu_usage()
         rospy.loginfo(f"GPU Usage: {gpu_usage:.2f}%")
 
-        masks = results.masks.to(self.device)  # マスクをGPUに送る
+        # RANSACで検出した平面のインデックスを用いてマスクを適用
+        masks = results.masks.to(self.device)
         x_numpy = masks[0].data.to('cpu').detach().numpy().copy()
-
-        name = results.names
         point = masks[0].xy
         point = np.array(point)
 
         # ３次元を２次元に変換する
-        result = []
-        for i in range(len(point)):
-            for j in range(len(point[i])):
-                my_list = []
-                for k in range(len(point[i][j])):
-                    my_list.append(point[i][j][k])
-                result.append(my_list)
-        point = np.array(result)
+        point = point.reshape(-1, point.shape[-1])  # 配列を2次元に変換
 
         # y座標が高い順にソート
         point = sorted(point, key=lambda x: x[1], reverse=True)
 
         # 上位70個のy座標が高い座標を取得
         top_points = point[:70]
-
+        
+        # ここでRANSACのインライヤーを使用してセグメンテーションをフィルタリング
+        filtered_points = [p for p in top_points if int(p[0]) in inliers]  # ここでインライヤー条件を適用
+        
         # 座標の表示
-        for i in range(len(top_points)):
-            (u, v) = (int(top_points[i][0]), int(top_points[i][1]))
+        for p in filtered_points:
+            (u, v) = (int(p[0]), int(p[1]))
             # 画像内に指定したクラス(results[0]の境界線を赤点で描画
             cv2.circle(img_color, (u, v), 10, (0, 0, 255), -1)
         
         # y座標のピクセル値が高い順に上位70個を選ぶ
-        top_points_y_sorted = sorted(top_points, key=lambda p: p[1], reverse=True)[:70]
+        top_points_y_sorted = sorted(filtered_points, key=lambda p: p[1], reverse=True)[:70]
 
         # x座標の中央値を計算するために、上位70個のうちx座標を絞る
         median_x_value = np.median([p[0] for p in top_points_y_sorted])
@@ -209,7 +204,7 @@ class SR:
         # 映像出力rosbag playでやるときのみ外す
         cv2.imshow('slope_detection', img_color)
         cv2.waitKey(1)  # ウィンドウを更新するためのキー入力を待つ
-        
+
 if __name__ == '__main__':
     model_path = "/home/carsim05/slope_ws/src/ros_Golib/slope_edge_detection/scripts/best.pt"
     node = SR(model_path)
