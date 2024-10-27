@@ -27,8 +27,14 @@ class SR:
         self.model = YOLO(model_path)
         self.model.model.to(self.device)
 
+        # ウィンドウの作成と位置設定
+        cv2.namedWindow('slope_detection')  # ウィンドウを事前に作成
+        cv2.moveWindow('slope_detection', 710, 850)  # ウィンドウの位置を設定
+        cv2.namedWindow('bgr')  # bgrウィンドウも作成
+        cv2.moveWindow('bgr', 710, 0)  # bgrウィンドウの位置を設定
+
         self.vis = o3d.visualization.Visualizer()
-        self.vis.create_window('PCD', width=640, height=480)
+        self.vis.create_window('PCD', width=640, height=480, left=0, top=550)
         self.pointcloud = o3d.geometry.PointCloud()
         self.geom_added = False
         self.rate = rospy.Rate(10)
@@ -135,7 +141,7 @@ class SR:
 
                 # GPU使用率を表示
                 gpu_usage = self.get_gpu_usage()
-                rospy.loginfo(f"GPU Usage: {gpu_usage:.2f}%")
+                #rospy.loginfo(f"GPU Usage: {gpu_usage:.2f}%")
 
                 cv2.imshow('bgr', self.color_image)
                 key = cv2.waitKey(1)
@@ -158,7 +164,7 @@ class SR:
         
         # GPU使用率を表示
         gpu_usage = self.get_gpu_usage()
-        rospy.loginfo(f"GPU Usage: {gpu_usage:.2f}%")
+        #rospy.loginfo(f"GPU Usage: {gpu_usage:.2f}%")
 
         # RANSACで検出した平面のインデックスを用いてマスクを適用
         masks = results.masks.to(self.device)
