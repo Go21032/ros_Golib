@@ -5,9 +5,9 @@ import numpy as np
 import csv
 import os
 
-model = YOLO("/home/carsim05/slope_ws/src/ros_Golib/slope_edge_detection/scripts/best.pt")
+model = YOLO(r"C:\Users\gakuh\OneDrive\ドキュメント\GitHub\ros_Golib\slope_edge_detection\scripts\only_slope_best.pt")
 
-img = Image.open("/home/carsim05/slope_ws/src/ros_Golib/slope_edge_detection/scripts/2dd/1008_resize/IMG_0708.jpg")
+img = Image.open(r"C:\Users\gakuh\OneDrive\ドキュメント\GitHub\ros_Golib\slope_edge_detection\scripts\2dd\1008_resize\IMG_0712.jpg")
 results = model.predict(source=img, save=True)
 
 masks = results[0].masks
@@ -47,14 +47,14 @@ x: x[1] は、リストの各要素 x のインデックス1の値（つまり y
 point = sorted(point, key=lambda x: x[1], reverse=True)
 
 # 上位50個のy座標が高い座標を取得
-top_points = point[:50]
+top_points = point[:140]
 
 # 座標の表示
 for i in range(len(top_points)):
     (u, v) = (int(top_points[i][0]), int(top_points[i][1]))
     print((u, v))
     # 画像内に指定したクラス(results[0]の境界線を赤点で描画
-    cv2.circle(img, (u, v), 10, (0, 0, 255), -1)
+    cv2.circle(img, (u, v), 5, (0, 0, 255), -1)
 
 # 上位50個の座標の中央値を算出
 median_x = int(np.median([p[0] for p in top_points]))
@@ -64,7 +64,7 @@ median_y = int(np.median([p[1] for p in top_points]))
 print("Median coordinate:", (median_x, median_y))
 
 # 中央値の座標を青点で描画
-cv2.circle(img, (median_x, median_y), 10, (255, 0, 0), -1)
+cv2.circle(img, (median_x, median_y), 5, (255, 0, 0), -1)
 
 # 画像を表示＆保存
 cv2.imwrite('top_mask10.jpg', img)
