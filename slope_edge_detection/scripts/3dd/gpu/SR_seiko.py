@@ -12,10 +12,11 @@ from ultralytics import YOLO
 
 class SR:
     def __init__(self, model_path):
-        rospy.init_node('SR_node')  # ノードの初期化をここに移動
+        rospy.init_node('SR_seiko_node')  # ノードの初期化をここに移動
         self.color_image = None
         self.depth_image = None
         self.intrinsics = None
+        self.previous_b = None  # 前の b の値を保持するための変数
         self.bridge = CvBridge()
         
         rospy.Subscriber('/camera/color/image_raw', Image, self.callback, callback_args='color')
@@ -101,7 +102,7 @@ class SR:
                     inlier_cloud.paint_uniform_color([1.0, 0, 0])
                     angle_with_vertical = np.arccos(np.abs(normal[1]))
                     angle_degrees = np.degrees(angle_with_vertical)
-                    rospy.loginfo(f"angle: {angle_degrees:.2f} degrees")
+                    rospy.loginfo(f"angle: {angle_degrees:.2f} degrees, omomi( a: {normal[0]:.2f}, b: {normal[1]:.2f}, c: {normal[2]:.2f}, d: {d:.2f})")
                     plane_segments = [inlier_cloud]
                 else:
                     plane_segments = []
@@ -117,10 +118,18 @@ class SR:
                         rospy.loginfo(f"信頼度: {mask_confidences[0]}")
                         if results[0].boxes and mask_confidences[0] > 0.8:
                             rospy.loginfo("信頼度が条件を満たしています")
-                            if angle_degrees > 31:
-                                rospy.loginfo(f"角度が条件を満たしています:{angle_degrees:.2f} degrees")
-                                if self.depth_image is not None:
-                                    self.process_segmentation(results[0], self.color_image, self.depth_image, inliers)
+                            # 法線ベクトルの b の値を取得（仮に normal[1] とします）
+                            b = normal[1]  # normal は事前に計算されていると仮定
+                    
+                            # 前の b の値が存在する場合に変動をチェック
+                            if self.previous_b is not None:
+                                if abs(b - self.previous_b) > 0.001:
+                                    rospy.loginfo(f"法線ベクトルの b の変動が条件を満たしています: {b:.4f}")
+
+                            # 現在の b の値を保存
+                            self.previous_b = b
+                            if self.depth_image is not None:
+                                self.process_segmentation(results[0], self.color_image, self.depth_image, inliers)
                 else:
                     rospy.logwarn("予測結果が存在しません")
 
