@@ -142,8 +142,8 @@ class SR:
                 # GPU使用率を表示
                 gpu_usage = self.get_gpu_usage()
                 #rospy.loginfo(f"GPU Usage: {gpu_usage:.2f}%")
-
-                cv2.imshow('bgr', self.color_image)
+                self.color_image_copy = self.color_image.copy()  # 元のカラー画像のコピーを作成
+                cv2.imshow('bgr', self.color_image_copy)
                 key = cv2.waitKey(1)
                 if key == ord('q'):
                     break
