@@ -6,6 +6,7 @@ import open3d as o3d
 import cv2
 import GPUtil
 import torch
+import csv  # CSVモジュールをインポート
 
 class PointCloudProcessor:
     def __init__(self):
@@ -14,6 +15,11 @@ class PointCloudProcessor:
         self.intrinsics = None
         self.bridge = CvBridge()
         rospy.init_node('pointcloud_node')
+        
+        # CSVファイルのオープン
+        self.csv_file = open('angles2.csv', mode='w', newline='')
+        self.csv_writer = csv.writer(self.csv_file)
+        self.csv_writer.writerow(['Angle (degrees)', 'a', 'b', 'c', 'd'])  # ヘッダーを書き込む
         
         # 高解像度に設定したカメラトピックを購読
         rospy.Subscriber('/camera/color/image_raw', Image, self.callback, callback_args='color')
@@ -87,7 +93,10 @@ class PointCloudProcessor:
                     inlier_cloud.paint_uniform_color([1.0, 0, 0])
                     angle_with_vertical = np.arccos(np.abs(normal[1]))
                     angle_degrees = np.degrees(angle_with_vertical)
-                    rospy.loginfo(f"angle: {angle_degrees:.2f} degrees")
+                    
+                    # CSVに書き込む
+                    self.csv_writer.writerow([angle_degrees, a, b, c, d])  
+                    rospy.loginfo(f"angle: {angle_degrees:.2f} degrees, omomi( a: {normal[0]:.2f}, b: {normal[1]:.2f}, c: {normal[2]:.2f}, d: {d:.2f})")
                     plane_segments = [inlier_cloud]
                 else:
                     plane_segments = []
@@ -116,6 +125,8 @@ class PointCloudProcessor:
                     break
                 self.rate.sleep()
         finally:
+            # CSVファイルを閉じる
+            self.csv_file.close()
             o3d.io.write_point_cloud("output2.ply", self.pointcloud)
             cv2.destroyAllWindows()
             self.vis.destroy_window()
