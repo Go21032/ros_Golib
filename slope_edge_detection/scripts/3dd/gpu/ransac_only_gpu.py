@@ -87,7 +87,7 @@ class PointCloudProcessor:
                     inlier_cloud.paint_uniform_color([1.0, 0, 0])
                     angle_with_vertical = np.arccos(np.abs(normal[1]))
                     angle_degrees = np.degrees(angle_with_vertical)
-                    rospy.loginfo(f"Ground plane tilt angle: {angle_degrees:.2f} degrees")
+                    rospy.loginfo(f"angle: {angle_degrees:.2f} degrees")
                     plane_segments = [inlier_cloud]
                 else:
                     plane_segments = []
@@ -108,7 +108,7 @@ class PointCloudProcessor:
 
                 # GPU使用率を表示
                 gpu_usage = self.get_gpu_usage()
-                rospy.loginfo(f"GPU Usage: {gpu_usage:.2f}%")
+                #rospy.loginfo(f"GPU Usage: {gpu_usage:.2f}%")
 
                 cv2.imshow('bgr', self.color_image)
                 key = cv2.waitKey(1)

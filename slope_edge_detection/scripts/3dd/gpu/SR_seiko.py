@@ -101,7 +101,7 @@ class SR:
                     inlier_cloud.paint_uniform_color([1.0, 0, 0])
                     angle_with_vertical = np.arccos(np.abs(normal[1]))
                     angle_degrees = np.degrees(angle_with_vertical)
-                    rospy.loginfo(f"Ground plane tilt angle: {angle_degrees:.2f} degrees")
+                    rospy.loginfo(f"angle: {angle_degrees:.2f} degrees")
                     plane_segments = [inlier_cloud]
                 else:
                     plane_segments = []
