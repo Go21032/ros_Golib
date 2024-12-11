@@ -17,6 +17,7 @@ class SR:
         self.depth_image = None
         self.intrinsics = None
         self.previous_b = None  # 前の b の値を保持するための変数
+        self.previous_c = None  # 前の c の値を保持するための変数
         self.bridge = CvBridge()
         
         rospy.Subscriber('/camera/color/image_raw', Image, self.callback, callback_args='color')
@@ -120,14 +121,17 @@ class SR:
                             rospy.loginfo("信頼度が条件を満たしています")
                             # 法線ベクトルの b の値を取得（仮に normal[1] とします）
                             b = normal[1]  # normal は事前に計算されていると仮定
-                    
+                            c = normal[2]
                             # 前の b の値が存在する場合に変動をチェック
                             if self.previous_b is not None:
-                                if abs(b - self.previous_b) > 0.001:
-                                    rospy.loginfo(f"法線ベクトルの b の変動が条件を満たしています: {b:.4f}")
+                                if self.previous_c is not None:
+                                    #前後の差分の絶対値が0.01以上ならそこからスロープありと判定
+                                    if abs(b - self.previous_b) > 0.01 and abs(c - self.previous_c) > 0.02:
+                                        rospy.loginfo(f"法線ベクトルの b と c の変動が条件を満たしています: {b:.4f}")
 
-                            # 現在の b の値を保存
+                            # 現在の b と c の値を保存
                             self.previous_b = b
+                            self.previous_c = c
                             if self.depth_image is not None:
                                 self.process_segmentation(results[0], self.color_image, self.depth_image, inliers)
                 else:

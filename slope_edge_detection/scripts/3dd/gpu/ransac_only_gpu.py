@@ -7,6 +7,7 @@ import cv2
 import GPUtil
 import torch
 import csv  # CSVモジュールをインポート
+from datetime import datetime  # datetimeモジュールをインポート
 
 class PointCloudProcessor:
     def __init__(self):
@@ -16,8 +17,12 @@ class PointCloudProcessor:
         self.bridge = CvBridge()
         rospy.init_node('pointcloud_node')
         
+        # 現在の時間を取得し、フォーマットを指定してCSVファイル名を生成
+        current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+        csv_filename = f'angles_{current_time}.csv'
+
         # CSVファイルのオープン
-        self.csv_file = open('angles2.csv', mode='w', newline='')
+        self.csv_file = open(csv_filename, mode='w', newline='')
         self.csv_writer = csv.writer(self.csv_file)
         self.csv_writer.writerow(['Angle (degrees)', 'a', 'b', 'c', 'd'])  # ヘッダーを書き込む
         
