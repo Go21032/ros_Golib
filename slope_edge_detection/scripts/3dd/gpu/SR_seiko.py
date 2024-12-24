@@ -4,11 +4,14 @@ import cv2
 import numpy as np
 import rospy
 import torch
-from sensor_msgs.msg import Image, CameraInfo
-from cv_bridge import CvBridge
+import time
 import open3d as o3d
 import GPUtil
+import csv  # CSVライブラリをインポート
+from sensor_msgs.msg import Image, CameraInfo
+from cv_bridge import CvBridge
 from ultralytics import YOLO
+from datetime import datetime  # datetimeモジュールをインポート
 
 class SR:
     def __init__(self, model_path):
@@ -28,6 +31,19 @@ class SR:
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.model = YOLO(model_path)
         self.model.model.to(self.device)
+
+        # 現在の時間を取得し、フォーマットを指定してCSVファイル名を生成
+        current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+        csv_filename = f'processing_time_{current_time}.csv'
+        
+        # CSVファイルの初期化
+        self.csv_file = open(csv_filename, mode='w', newline='')
+        self.csv_writer = csv.writer(self.csv_file)
+        self.csv_writer.writerow(['処理名', '時間（秒）', '成功率（%）'])  # ヘッダー行を書き込み
+
+        # 成功した平面検出のカウンタと全体のフレーム数
+        self.successful_plane_detections = 0
+        self.total_frames = 0
 
         # ウィンドウの作成と位置設定
         cv2.namedWindow('slope_detection')  # ウィンドウを事前に作成
@@ -92,6 +108,7 @@ class SR:
                 filtered_pcd = filtered_pcd.voxel_down_sample(voxel_size=0.0015)
 
                 # 平面セグメンテーション
+                start_pcd = time.time() #計測開始
                 plane_model, inliers = filtered_pcd.segment_plane(distance_threshold=0.01, ransac_n=3, num_iterations=1000)
                 inlier_cloud = filtered_pcd.select_by_index(inliers)
                 a, b, c, d = plane_model
@@ -105,8 +122,14 @@ class SR:
                     angle_degrees = np.degrees(angle_with_vertical)
                     rospy.loginfo(f"angle: {angle_degrees:.2f} degrees, omomi( a: {normal[0]:.2f}, b: {normal[1]:.2f}, c: {normal[2]:.2f}, d: {d:.2f})")
                     plane_segments = [inlier_cloud]
+                    self.successful_plane_detections += 1  # 成功したカウントを増やす
                 else:
                     plane_segments = []
+                
+                end_pcd = time.time() #計測終了
+                pcd_time = end_pcd - start_pcd
+                rospy.loginfo(f"平面処理時間: {pcd_time:.4f}秒")
+                self.csv_writer.writerow(['平面', pcd_time, ''])  # 初期値として空の成功率を記入
 
                 # YOLOでスロープを検出
                 pil_img = cv2.cvtColor(self.color_image, cv2.COLOR_BGR2RGB)
@@ -160,7 +183,17 @@ class SR:
                 key = cv2.waitKey(1)
                 if key == ord('q'):
                     break
+                self.total_frames += 1  # フレームカウントを増やす
                 self.rate.sleep()
+            # 成功率を計算
+            if self.total_frames > 0:
+                success_rate = (self.successful_plane_detections / self.total_frames) * 100
+            else:
+                success_rate = 0.0
+            
+            # 成功率をCSVに書き込む
+            self.csv_writer.writerow(['成功率', '', success_rate])
+
         finally:
             o3d.io.write_point_cloud("output2.ply", self.pointcloud)
             cv2.destroyAllWindows()
@@ -170,7 +203,7 @@ class SR:
         if not results or not results.masks:
             rospy.logwarn("予測結果が存在しません")
             return
-        
+        start_seg = time.time()
         # 信頼度の取得と表示
         mask_confidences = results.boxes.conf
         print("信頼度:", mask_confidences)
@@ -219,7 +252,11 @@ class SR:
             cv2.circle(img_color, (median_x, median_y), 10, (255, 0, 0), -1)
         else:
             rospy.logwarn("中央値を計算するための候補がありません")
-        
+        end_seg = time.time()
+        seg_time = end_seg - start_seg
+        rospy.loginfo(f"セマンティックセグメンテーションの処理時間: {seg_time:.4f}秒")
+        self.csv_writer.writerow(['セグメンテーション', seg_time])
+
         # 映像出力rosbag playでやるときのみ外す
         cv2.imshow('slope_detection', img_color)
         cv2.waitKey(1)  # ウィンドウを更新するためのキー入力を待つ
