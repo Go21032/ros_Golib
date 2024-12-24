@@ -131,6 +131,15 @@ class SR:
                 rospy.loginfo(f"平面処理時間: {pcd_time:.4f}秒")
                 self.csv_writer.writerow(['平面', pcd_time, ''])  # 初期値として空の成功率を記入
 
+                self.total_frames += 1  # フレームカウントを増やす
+                # 成功率を計算
+                if self.total_frames > 0:
+                    success_rate = (self.successful_plane_detections / self.total_frames) * 100
+                else:
+                    success_rate = 0.0
+                
+                # 成功率をCSVに書き込む
+                self.csv_writer.writerow(['成功率', '', success_rate])
                 # YOLOでスロープを検出
                 pil_img = cv2.cvtColor(self.color_image, cv2.COLOR_BGR2RGB)
                 results = self.model.predict(source=pil_img, device=self.device, verbose=False)
@@ -183,16 +192,7 @@ class SR:
                 key = cv2.waitKey(1)
                 if key == ord('q'):
                     break
-                self.total_frames += 1  # フレームカウントを増やす
                 self.rate.sleep()
-            # 成功率を計算
-            if self.total_frames > 0:
-                success_rate = (self.successful_plane_detections / self.total_frames) * 100
-            else:
-                success_rate = 0.0
-            
-            # 成功率をCSVに書き込む
-            self.csv_writer.writerow(['成功率', '', success_rate])
 
         finally:
             o3d.io.write_point_cloud("output2.ply", self.pointcloud)
