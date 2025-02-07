@@ -95,7 +95,7 @@ class PointCloudProcessor:
                     break
                 self.rate.sleep()
         finally:
-            o3d.io.write_point_cloud("output2.ply", self.pointcloud)
+            o3d.io.write_point_cloud("2doutput2.ply", self.pointcloud)
             cv2.destroyAllWindows()
             self.vis.destroy_window()
 if __name__ == '__main__':

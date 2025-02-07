@@ -111,7 +111,7 @@ class SR:
                 # 平面セグメンテーション
                 # RANSAC処理を3秒ごとに実行
                 current_time = time.time()
-                if current_time - last_ransac_time >= 3.0:  # 3秒経過したら処理を実行
+                if current_time - last_ransac_time >= 0.0:  # 3秒経過したら処理を実行
                     start_pcd = time.time() #計測開始
                     plane_model, inliers = filtered_pcd.segment_plane(distance_threshold=0.01, ransac_n=3, num_iterations=1000)
                     inlier_cloud = filtered_pcd.select_by_index(inliers)
@@ -164,12 +164,12 @@ class SR:
                                         #前後の差分の絶対値が0.01以上ならそこからスロープありと判定
                                         if abs(b - self.previous_b) > 0.01 and abs(c - self.previous_c) > 0.02:
                                             rospy.loginfo(f"法線ベクトルの b と c の変動が条件を満たしています: {b:.4f}")
+                                            self.process_segmentation(results[0], self.color_image, self.depth_image, inliers)
 
                                 # 現在の b と c の値を保存
                                 self.previous_b = b
                                 self.previous_c = c
-                                if self.depth_image is not None:
-                                    self.process_segmentation(results[0], self.color_image, self.depth_image, inliers)
+                                
                     else:
                         rospy.logwarn("予測結果が存在しません")
 
@@ -266,6 +266,6 @@ class SR:
         cv2.waitKey(1)  # ウィンドウを更新するためのキー入力を待つ
 
 if __name__ == '__main__':
-    model_path = "/home/carsim05/slope_ws/src/ros_Golib/slope_edge_detection/scripts/only_slope_best.pt"
+    model_path = "/home/carsim05/slope_ws/src/ros_Golib/slope_edge_detection/scripts/best.pt"
     node = SR(model_path)
     node.process_pointcloud()  # メインループを開始
