@@ -133,6 +133,6 @@ class SlopeDetection:
 
 if __name__ == '__main__':
     rospy.init_node('slope_detection')
-    model_path = "/home/carsim05/slope_ws/src/ros_Golib/slope_edge_detection/scripts/best.pt"
+    model_path = "/home/carsim05/slope_ws/src/ros_Golib/slope_edge_detection/scripts/only_slope_best.pt"
     node = SlopeDetection(model_path)
     rospy.spin()

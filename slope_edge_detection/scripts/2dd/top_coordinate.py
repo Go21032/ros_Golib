@@ -5,9 +5,9 @@ import numpy as np
 import csv
 import os
 
-model = YOLO("/home/carsim05/slope_ws/src/ros_Golib/slope_edge_detection/scripts/best.pt")
+model = YOLO("/home/carsim05/slope_ws/src/ros_Golib/slope_edge_detection/scripts/1008best.pt")
 
-img = Image.open("/home/carsim05/slope_ws/src/ros_Golib/slope_edge_detection/scripts/2dd/1008_resize/IMG_0708.jpg")
+img = Image.open("/home/carsim05/slope_ws/src/ros_Golib/slope_edge_detection/scripts/2dd/kennsyou/slope_190.png")
 results = model.predict(source=img, save=True)
 
 masks = results[0].masks
@@ -47,7 +47,7 @@ x: x[1] は、リストの各要素 x のインデックス1の値（つまり y
 point = sorted(point, key=lambda x: x[1], reverse=True)
 
 # 上位50個のy座標が高い座標を取得
-top_points = point[:50]
+top_points = point[:70]
 
 # 座標の表示
 for i in range(len(top_points)):

@@ -73,6 +73,7 @@ class SR:
 
     def process_pointcloud(self):
         try:
+            last_ransac_time = time.time()  # 最後のRANSAC処理の時間を初期化
             while not rospy.is_shutdown():
                 if self.color_image is None or self.depth_image is None or self.intrinsics is None:
                     rospy.loginfo("Waiting for images and camera info...")
@@ -108,91 +109,94 @@ class SR:
                 filtered_pcd = filtered_pcd.voxel_down_sample(voxel_size=0.0015)
 
                 # 平面セグメンテーション
-                start_pcd = time.time() #計測開始
-                plane_model, inliers = filtered_pcd.segment_plane(distance_threshold=0.01, ransac_n=3, num_iterations=1000)
-                inlier_cloud = filtered_pcd.select_by_index(inliers)
-                a, b, c, d = plane_model
-                normal = np.array([a, b, c])
+                # RANSAC処理を3秒ごとに実行
+                current_time = time.time()
+                if current_time - last_ransac_time >= 3.0:  # 3秒経過したら処理を実行
+                    start_pcd = time.time() #計測開始
+                    plane_model, inliers = filtered_pcd.segment_plane(distance_threshold=0.01, ransac_n=3, num_iterations=1000)
+                    inlier_cloud = filtered_pcd.select_by_index(inliers)
+                    a, b, c, d = plane_model
+                    normal = np.array([a, b, c])
 
-                angle_degrees = 0
-                
-                if np.abs(normal[1]) < 0.9:
-                    inlier_cloud.paint_uniform_color([1.0, 0, 0])
-                    angle_with_vertical = np.arccos(np.abs(normal[1]))
-                    angle_degrees = np.degrees(angle_with_vertical)
-                    rospy.loginfo(f"angle: {angle_degrees:.2f} degrees, omomi( a: {normal[0]:.2f}, b: {normal[1]:.2f}, c: {normal[2]:.2f}, d: {d:.2f})")
-                    plane_segments = [inlier_cloud]
-                    self.successful_plane_detections += 1  # 成功したカウントを増やす
-                else:
-                    plane_segments = []
-                
-                end_pcd = time.time() #計測終了
-                pcd_time = end_pcd - start_pcd
-                rospy.loginfo(f"平面処理時間: {pcd_time:.4f}秒")
-                self.csv_writer.writerow(['平面', pcd_time, ''])  # 初期値として空の成功率を記入
-
-                self.total_frames += 1  # フレームカウントを増やす
-                # 成功率を計算
-                if self.total_frames > 0:
-                    success_rate = (self.successful_plane_detections / self.total_frames) * 100
-                else:
-                    success_rate = 0.0
-                
-                # 成功率をCSVに書き込む
-                self.csv_writer.writerow(['成功率', '', success_rate])
-                # YOLOでスロープを検出
-                pil_img = cv2.cvtColor(self.color_image, cv2.COLOR_BGR2RGB)
-                results = self.model.predict(source=pil_img, device=self.device, verbose=False)
-
-                if results:
-                    if results[0].masks:
-                        rospy.loginfo("マスクがあります")
-                        mask_confidences = results[0].boxes.conf
-                        rospy.loginfo(f"信頼度: {mask_confidences[0]}")
-                        if results[0].boxes and mask_confidences[0] > 0.8:
-                            rospy.loginfo("信頼度が条件を満たしています")
-                            # 法線ベクトルの b の値を取得（仮に normal[1] とします）
-                            b = normal[1]  # normal は事前に計算されていると仮定
-                            c = normal[2]
-                            # 前の b の値が存在する場合に変動をチェック
-                            if self.previous_b is not None:
-                                if self.previous_c is not None:
-                                    #前後の差分の絶対値が0.01以上ならそこからスロープありと判定
-                                    if abs(b - self.previous_b) > 0.01 and abs(c - self.previous_c) > 0.02:
-                                        rospy.loginfo(f"法線ベクトルの b と c の変動が条件を満たしています: {b:.4f}")
-
-                            # 現在の b と c の値を保存
-                            self.previous_b = b
-                            self.previous_c = c
-                            if self.depth_image is not None:
-                                self.process_segmentation(results[0], self.color_image, self.depth_image, inliers)
-                else:
-                    rospy.logwarn("予測結果が存在しません")
-
-
-                if plane_segments:
-                    combined_points = np.vstack([np.asarray(plane.points) for plane in plane_segments])
-                    combined_colors = np.vstack([np.asarray(plane.colors) for plane in plane_segments])
-                    self.pointcloud.points = o3d.utility.Vector3dVector(combined_points)
-                    self.pointcloud.colors = o3d.utility.Vector3dVector(combined_colors)
-                    if not self.geom_added:
-                        self.vis.add_geometry(self.pointcloud)
-                        self.geom_added = True
+                    angle_degrees = 0
+                    
+                    if np.abs(normal[1]) < 0.9:
+                        inlier_cloud.paint_uniform_color([1.0, 0, 0])
+                        angle_with_vertical = np.arccos(np.abs(normal[1]))
+                        angle_degrees = np.degrees(angle_with_vertical)
+                        rospy.loginfo(f"angle: {angle_degrees:.2f} degrees, omomi( a: {normal[0]:.2f}, b: {normal[1]:.2f}, c: {normal[2]:.2f}, d: {d:.2f})")
+                        plane_segments = [inlier_cloud]
+                        self.successful_plane_detections += 1  # 成功したカウントを増やす
                     else:
-                        self.vis.update_geometry(self.pointcloud)
+                        plane_segments = []
+                    
+                    end_pcd = time.time() #計測終了
+                    pcd_time = end_pcd - start_pcd
+                    rospy.loginfo(f"平面処理時間: {pcd_time:.4f}秒")
+                    self.csv_writer.writerow(['平面', pcd_time, ''])  # 初期値として空の成功率を記入
 
-                self.vis.poll_events()
-                self.vis.update_renderer()
+                    self.total_frames += 1  # フレームカウントを増やす
+                    # 成功率を計算
+                    if self.total_frames > 0:
+                        success_rate = (self.successful_plane_detections / self.total_frames) * 100
+                    else:
+                        success_rate = 0.0
+                    
+                    # 成功率をCSVに書き込む
+                    self.csv_writer.writerow(['成功率', '', success_rate])
+                    # YOLOでスロープを検出
+                    pil_img = cv2.cvtColor(self.color_image, cv2.COLOR_BGR2RGB)
+                    results = self.model.predict(source=pil_img, device=self.device, verbose=False)
 
-                # GPU使用率を表示
-                gpu_usage = self.get_gpu_usage()
-                #rospy.loginfo(f"GPU Usage: {gpu_usage:.2f}%")
-                self.color_image_copy = self.color_image.copy()  # 元のカラー画像のコピーを作成
-                cv2.imshow('bgr', self.color_image_copy)
-                key = cv2.waitKey(1)
-                if key == ord('q'):
-                    break
-                self.rate.sleep()
+                    if results:
+                        if results[0].masks:
+                            rospy.loginfo("マスクがあります")
+                            mask_confidences = results[0].boxes.conf
+                            rospy.loginfo(f"信頼度: {mask_confidences[0]}")
+                            if results[0].boxes and mask_confidences[0] > 0.8:
+                                rospy.loginfo("信頼度が条件を満たしています")
+                                # 法線ベクトルの b の値を取得（仮に normal[1] とします）
+                                b = normal[1]  # normal は事前に計算されていると仮定
+                                c = normal[2]
+                                # 前の b の値が存在する場合に変動をチェック
+                                if self.previous_b is not None:
+                                    if self.previous_c is not None:
+                                        #前後の差分の絶対値が0.01以上ならそこからスロープありと判定
+                                        if abs(b - self.previous_b) > 0.01 and abs(c - self.previous_c) > 0.02:
+                                            rospy.loginfo(f"法線ベクトルの b と c の変動が条件を満たしています: {b:.4f}")
+
+                                # 現在の b と c の値を保存
+                                self.previous_b = b
+                                self.previous_c = c
+                                if self.depth_image is not None:
+                                    self.process_segmentation(results[0], self.color_image, self.depth_image, inliers)
+                    else:
+                        rospy.logwarn("予測結果が存在しません")
+
+
+                    if plane_segments:
+                        combined_points = np.vstack([np.asarray(plane.points) for plane in plane_segments])
+                        combined_colors = np.vstack([np.asarray(plane.colors) for plane in plane_segments])
+                        self.pointcloud.points = o3d.utility.Vector3dVector(combined_points)
+                        self.pointcloud.colors = o3d.utility.Vector3dVector(combined_colors)
+                        if not self.geom_added:
+                            self.vis.add_geometry(self.pointcloud)
+                            self.geom_added = True
+                        else:
+                            self.vis.update_geometry(self.pointcloud)
+
+                    self.vis.poll_events()
+                    self.vis.update_renderer()
+
+                    # GPU使用率を表示
+                    gpu_usage = self.get_gpu_usage()
+                    #rospy.loginfo(f"GPU Usage: {gpu_usage:.2f}%")
+                    self.color_image_copy = self.color_image.copy()  # 元のカラー画像のコピーを作成
+                    cv2.imshow('bgr', self.color_image_copy)
+                    key = cv2.waitKey(1)
+                    if key == ord('q'):
+                        break
+                    self.rate.sleep()
 
         finally:
             o3d.io.write_point_cloud("output2.ply", self.pointcloud)
@@ -262,6 +266,6 @@ class SR:
         cv2.waitKey(1)  # ウィンドウを更新するためのキー入力を待つ
 
 if __name__ == '__main__':
-    model_path = "/home/carsim05/slope_ws/src/ros_Golib/slope_edge_detection/scripts/best.pt"
+    model_path = "/home/carsim05/slope_ws/src/ros_Golib/slope_edge_detection/scripts/only_slope_best.pt"
     node = SR(model_path)
     node.process_pointcloud()  # メインループを開始
